@@ -1,0 +1,208 @@
+# EDM Cue Analyzer
+
+Automated cue point generation for DJ performance optimized for EDM tracks. Analyzes audio files to intelligently place hot cues and memory cues based on track structure, then exports to Rekordbox XML format.
+
+## Features
+
+- **Multi-format Support**: Works with MP3, FLAC, WAV, and other audio formats
+- **Intelligent Analysis**: Automatically detects drops, breakdowns, builds, and energy patterns
+- **Configurable Cue System**: 8 hot cues (A-H) + memory cues with customizable positioning
+- **Rekordbox Export**: Direct XML export for seamless Rekordbox import
+- **Library & CLI**: Use as a Python library or standalone command-line tool
+- **Color-coded Display**: Beautiful terminal output with color-coded cue information
+- **Fully Configurable**: Customize cue positions, colors, loop lengths via YAML config
+
+## Installation
+
+### From Source
+
+```bash
+git clone https://github.com/yourusername/edm-cue-analyzer.git
+cd edm-cue-analyzer
+pip install -e .
+```
+
+### Requirements
+
+- Python 3.8+
+- librosa
+- numpy
+- pyyaml
+- colorama
+
+## Quick Start
+
+### Command Line
+
+```bash
+# Analyze a track with default settings
+edm-cue-analyzer track.mp3
+
+# Export to Rekordbox XML
+edm-cue-analyzer track.flac -o cues.xml
+
+# Use custom configuration
+edm-cue-analyzer track.mp3 -c custom_config.yaml
+
+# Analyze without terminal display
+edm-cue-analyzer track.mp3 --no-display -o output.xml
+```
+
+### As a Library
+
+```python
+from pathlib import Path
+from edm_cue_analyzer import (
+    load_config,
+    AudioAnalyzer,
+    CueGenerator,
+    export_to_rekordbox,
+    display_results
+)
+
+# Load configuration
+config = load_config()
+
+# Analyze audio file
+analyzer = AudioAnalyzer(config.analysis)
+structure = analyzer.analyze_file(Path("track.mp3"))
+
+# Generate cues
+generator = CueGenerator(config)
+cues = generator.generate_cues(structure)
+
+# Display results
+display_results("track.mp3", structure, cues)
+
+# Export to Rekordbox
+export_to_rekordbox(
+    Path("track.mp3"),
+    cues,
+    structure,
+    Path("output.xml")
+)
+```
+
+## Default Cue System
+
+### Hot Cues (A-H)
+
+| Cue | Name | Position | Loop | Color | Purpose |
+|-----|------|----------|------|-------|---------|
+| A | Early Intro | 8% | 8 bars | BLUE | Early intro blend point (minimal/safest) |
+| B | Late Intro | 20% | 16 bars | GREEN | Late intro blend (stable loop) |
+| C | Pre-Drop | Before 1st drop | 4 bars | ORANGE | Setup for drop swaps (timing tool) |
+| D | Post-Drop | After 1st drop | 8 bars | GREEN | High-energy exit (stable loop) |
+| E | Breakdown | 1st breakdown | 16 bars | TEAL | Breakdown entry/exit (structured phrase) |
+| F | Second Energy | 2nd drop | 8 bars | YELLOW | Second energy point (melodic highlight) |
+| G | Outro Start | 85% | 8 bars | GREEN | Outro exit (stable loop) |
+| H | Safe Hold | 50% | 16 bars | BLUE | Emergency safe hold (minimal/safest) |
+
+### Memory Cues
+
+- Track Start (0%)
+- First Drop (detected)
+- First Breakdown (detected)
+- Second Drop (detected)
+- Outro (85%)
+
+### Color System
+
+- **BLUE**: Minimal/safest - lowest complexity for reliable live mixing
+- **GREEN**: Stable loop - safe for direct transitions
+- **TEAL**: Structured phrase - requires bridge timing
+- **YELLOW**: Melodic highlight - musical variation requiring deliberate use
+- **ORANGE**: Timing tool/build - unstable, use for beatmatching only
+- **PURPLE**: Adjusted loop - loop length modified from target
+- **RED**: Instant jump/unstable - for drops swaps, not stable looping
+
+## Configuration
+
+Create a custom YAML configuration file to modify cue behavior:
+
+```yaml
+# custom_config.yaml
+hot_cues:
+  A:
+    name: "My Custom Cue"
+    position_percent: 0.10  # 10% into track
+    loop_bars: 16
+    color: "GREEN"
+
+  C:
+    name: "Pre-Drop"
+    position_method: "before_first_drop"
+    offset_bars: -2  # 2 bars before drop
+    loop_bars: 4
+    color: "ORANGE"
+
+analysis:
+  energy_window_seconds: 5.0
+  energy_threshold_increase: 0.15
+  drop_energy_multiplier: 1.3
+```
+
+### Position Methods
+
+Cues can be positioned by:
+
+- **Percentage**: `position_percent: 0.5` (50% through track)
+- **Structure Detection**: 
+  - `first_drop`, `second_drop`, `third_drop`
+  - `after_first_drop`, `after_second_drop`
+  - `before_first_drop`, `before_second_drop`
+  - `first_breakdown`, `second_breakdown`
+  - `first_build`, `second_build`
+- **Offset**: Use `offset_bars` to shift from detected position (positive = later, negative = earlier)
+
+## Testing
+
+Run the test suite:
+
+```bash
+# Install dev dependencies
+pip install -e ".[dev]"
+
+# Run tests
+pytest tests/ -v
+
+# Run with coverage
+pytest tests/ --cov=edm_cue_analyzer --cov-report=html
+```
+
+## Architecture
+
+```
+edm_cue_analyzer/
+├── config.py           # Configuration management
+├── analyzer.py         # Audio analysis with librosa
+├── cue_generator.py    # Cue point generation logic
+├── rekordbox.py        # Rekordbox XML export
+├── display.py          # Terminal display with colors
+└── cli.py              # Command-line interface
+```
+
+## How It Works
+
+1. **Audio Analysis**: Uses librosa to extract tempo, beats, energy profile, and spectral characteristics
+2. **Structure Detection**: Identifies drops (energy increases), breakdowns (energy decreases), and builds (gradual rises)
+3. **Cue Generation**: Places cues based on configuration, either at fixed percentages or detected structural points
+4. **Export**: Generates Rekordbox-compatible XML with proper cue formatting, colors, and loop lengths
+
+## Contributing
+
+Contributions welcome! Please feel free to submit issues and pull requests.
+
+## License
+
+MIT License - see LICENSE file for details
+
+## Acknowledgments
+
+- Built with [librosa](https://librosa.org/) for audio analysis
+- Inspired by professional DJ workflows and CDJ 3000 capabilities
+- Designed for EDM track structure and mixing techniques
+
+## Related Projects
+
+For a comprehensive DJ mixing system including this cue analyzer, see the full DJ Cue Analysis documentation.
