@@ -7,10 +7,8 @@ name = "edm-cue-analyzer"
 version = "1.0.0"
 description = "Automated cue point generation for DJ performance"
 readme = "README.md"
-authors = [
-    {name = "EDM Cue Analyzer Project"}
-]
-license = {text = "MIT"}
+authors = [{ name = "EDM Cue Analyzer Project" }]
+license = { text = "MIT" }
 requires-python = ">=3.10,<3.13"
 classifiers = [
     "Development Status :: 4 - Beta",
@@ -33,15 +31,8 @@ dependencies = [
 
 [project.optional-dependencies]
 # Essentia provides best BPM detection for EDM (requires Linux or Dev Container)
-essentia = [
-    "essentia>=2.1b5",
-]
-dev = [
-    "pytest>=7.0",
-    "pytest-cov>=4.0",
-    "ruff>=0.3.0",
-    "mypy>=1.8.0",
-]
+essentia = ["essentia>=2.1b5"]
+dev = ["pytest>=7.0", "pytest-cov>=4.0", "ruff>=0.3.0", "mypy>=1.8.0"]
 
 [project.scripts]
 edm-cue-analyzer = "edm_cue_analyzer.cli:main"
@@ -52,7 +43,7 @@ Repository = "https://github.com/crsmithdev/edm-cue-analyzer"
 Issues = "https://github.com/crsmithdev/edm-cue-analyzer/issues"
 
 [tool.setuptools]
-package-dir = {"" = "src"}
+package-dir = { "" = "src" }
 
 [tool.setuptools.packages.find]
 where = ["src"]
@@ -100,13 +91,13 @@ indent-style = "space"
 python_version = "3.10"
 warn_return_any = true
 warn_unused_configs = true
-disallow_untyped_defs = false  # Start permissive, tighten later
+disallow_untyped_defs = false # Start permissive, tighten later
 check_untyped_defs = true
 warn_redundant_casts = true
 warn_unused_ignores = true
 warn_no_return = true
 strict_equality = true
-ignore_missing_imports = true  # For libraries without type stubs
+ignore_missing_imports = true # For libraries without type stubs
 
 [tool.coverage.run]
 source = ["src"]
