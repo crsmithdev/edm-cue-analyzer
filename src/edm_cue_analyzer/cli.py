@@ -135,6 +135,13 @@ Examples:
         else "%(levelname)s: %(message)s"
     )
     logging.basicConfig(level=log_level, format=log_format)
+    
+    # Set log level for edm_cue_analyzer package
+    logging.getLogger("edm_cue_analyzer").setLevel(log_level)
+    
+    # Suppress overly verbose libraries
+    logging.getLogger("numba").setLevel(logging.WARNING)
+    logging.getLogger("matplotlib").setLevel(logging.WARNING)
 
     # Validate input file
     if not args.input.exists():
