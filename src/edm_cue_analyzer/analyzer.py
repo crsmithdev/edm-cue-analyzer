@@ -10,6 +10,7 @@ from pathlib import Path
 
 import librosa
 import numpy as np
+import soundfile as sf
 
 from .config import AnalysisConfig
 
@@ -362,7 +363,7 @@ class AudioAnalyzer:
         # Default feature extractors - use Essentia when available for better EDM analysis
         if feature_extractors is None:
             self.feature_extractors = []
-            
+
             # Add spectral feature extractor (Essentia preferred, librosa fallback)
             if ESSENTIA_AVAILABLE:
                 self.feature_extractors.append(EssentiaSpectralFeatureExtractor())
@@ -373,7 +374,7 @@ class AudioAnalyzer:
                 self.feature_extractors.append(HPSSFeatureExtractor())
                 self.feature_extractors.append(SpectralFeatureExtractor())
                 logger.debug("Using librosa-based feature extractors with HPSS")
-            
+
             # Add onset detector (Essentia preferred, librosa fallback)
             if ESSENTIA_AVAILABLE:
                 self.feature_extractors.append(EssentiaOnsetFeatureExtractor())
@@ -416,12 +417,20 @@ class AudioAnalyzer:
             raise FileNotFoundError(f"Audio file not found: {audio_path}")
 
         logger.debug("Loading audio file: %s", audio_path)
-        # Load audio file (librosa.load is I/O bound, run in executor)
+        # Load audio file using soundfile (faster, no resampling)
+        # Then resample only if needed for librosa compatibility
         load_start = time.perf_counter()
-        y, sr = await asyncio.to_thread(librosa.load, str(audio_path))
-        duration = librosa.get_duration(y=y, sr=sr)
+
+        # Load with native sample rate (much faster than librosa.load)
+        y, sr = await asyncio.to_thread(sf.read, str(audio_path), dtype="float32")
+
+        # Convert to mono if stereo
+        if y.ndim > 1:
+            y = y.mean(axis=1)
+
+        duration = len(y) / sr
         load_time = time.perf_counter() - load_start
-        logger.info(f"⏱️  Audio loading: {load_time:.2f}s")
+        logger.info(f"⏱️  Audio loading: {load_time:.2f}s (native {sr} Hz, no resampling)")
         logger.debug("Audio loaded: duration=%.2fs, sample_rate=%d", duration, sr)
 
         # Validate minimum duration
