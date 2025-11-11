@@ -18,6 +18,7 @@ logger = logging.getLogger(__name__)
 
 def timed(operation_name: str = None):
     """Decorator to time functions and log performance."""
+
     def decorator(func):
         @wraps(func)
         def sync_wrapper(*args, **kwargs):
@@ -48,11 +49,14 @@ def timed(operation_name: str = None):
                 raise
 
         return async_wrapper if asyncio.iscoroutinefunction(func) else sync_wrapper
+
     return decorator
+
 
 # Try to import essentia for best beat tracking (especially for EDM)
 try:
     import essentia.standard as es
+
     ESSENTIA_AVAILABLE = True
     logger.debug("Essentia available - will use for BPM detection")
 except ImportError:
@@ -63,6 +67,7 @@ except ImportError:
 if not ESSENTIA_AVAILABLE:
     try:
         import aubio
+
         AUBIO_AVAILABLE = True
         logger.debug("Aubio available - will use for BPM detection")
     except ImportError:
@@ -228,42 +233,44 @@ class EssentiaOnsetFeatureExtractor(FeatureExtractor):
         hopsize = 512
 
         # Setup Essentia algorithms
-        w = es.Windowing(type='hann')
+        w = es.Windowing(type="hann")
         fft = es.FFT()
         c2p = es.CartesianToPolar()
-        
+
         # Use 'complex' method - best for percussive EDM drops
-        onset_detection = es.OnsetDetection(method='complex')
-        
+        onset_detection = es.OnsetDetection(method="complex")
+
         # Process frames
         onset_values = []
         for frame in es.FrameGenerator(y, frameSize=framesize, hopSize=hopsize):
             mag, phase = c2p(fft(w(frame)))
             onset_values.append(onset_detection(mag, phase))
-        
+
         onset_strength = np.array(onset_values)
-        
+
         # Detect onset peaks using simple peak detection
         # Essentia's Onsets() expects different format, so we'll use a simpler approach
         threshold = np.mean(onset_strength) + np.std(onset_strength)
         onset_indices = []
-        
+
         # Find peaks above threshold with minimum spacing
         min_spacing = int(0.07 * sr / hopsize)  # 70ms minimum between onsets
         last_onset = -min_spacing
-        
+
         for i in range(1, len(onset_strength) - 1):
-            if (onset_strength[i] > threshold and
-                onset_strength[i] > onset_strength[i-1] and
-                onset_strength[i] > onset_strength[i+1] and
-                (i - last_onset) > min_spacing):
+            if (
+                onset_strength[i] > threshold
+                and onset_strength[i] > onset_strength[i - 1]
+                and onset_strength[i] > onset_strength[i + 1]
+                and (i - last_onset) > min_spacing
+            ):
                 onset_indices.append(i)
                 last_onset = i
-        
+
         onset_times = np.array(onset_indices) * hopsize / sr  # Convert to seconds
-        
+
         logger.debug(f"Essentia detected {len(onset_times)} onsets")
-        
+
         return {
             "onset_strength": onset_strength,
             "onset_times": onset_times,
@@ -288,35 +295,35 @@ class EssentiaSpectralFeatureExtractor(FeatureExtractor):
         hopsize = 512
 
         # Setup Essentia algorithms
-        w = es.Windowing(type='hann')
+        w = es.Windowing(type="hann")
         spectrum = es.Spectrum()
-        
+
         # Key algorithms for EDM analysis
         complexity_algo = es.SpectralComplexity()
         contrast_algo = es.SpectralContrast()
         centroid_algo = es.Centroid()
         hfc_algo = es.HFC()  # High Frequency Content
-        
+
         # Process frames
         complexities = []
         contrasts = []
         centroids = []
         hfcs = []
-        
+
         for frame in es.FrameGenerator(y, frameSize=framesize, hopSize=hopsize):
             spec = spectrum(w(frame))
             complexities.append(complexity_algo(spec))
             contrasts.append(contrast_algo(spec))
             centroids.append(centroid_algo(spec))
             hfcs.append(hfc_algo(spec))
-        
+
         features = {
             "spectral_complexity": np.array(complexities),
             "spectral_contrast": np.array(contrasts),
             "spectral_centroid": np.array(centroids),
             "hfc": np.array(hfcs),  # High frequency content
         }
-        
+
         # Also calculate frequency band energy for compatibility
         stft = np.abs(librosa.stft(y))
         freqs = librosa.fft_frequencies(sr=sr)
@@ -331,9 +338,9 @@ class EssentiaSpectralFeatureExtractor(FeatureExtractor):
         features["low_energy"] = np.mean(stft[low_mask, :], axis=0)
         features["mid_energy"] = np.mean(stft[mid_mask, :], axis=0)
         features["high_energy"] = np.mean(stft[high_mask, :], axis=0)
-        
+
         logger.debug("Essentia extracted spectral features: complexity, contrast, centroid, HFC")
-        
+
         return features
 
 
@@ -354,16 +361,24 @@ class AudioAnalyzer:
 
         # Default feature extractors - use Essentia when available for better EDM analysis
         if feature_extractors is None:
-            self.feature_extractors = [
-                HPSSFeatureExtractor(),  # No Essentia equivalent, keep librosa
-                # Use Essentia extractors if available, fall back to librosa
-                EssentiaSpectralFeatureExtractor() if ESSENTIA_AVAILABLE else SpectralFeatureExtractor(),
-                EssentiaOnsetFeatureExtractor() if ESSENTIA_AVAILABLE else OnsetFeatureExtractor(),
-            ]
+            self.feature_extractors = []
+            
+            # Add spectral feature extractor (Essentia preferred, librosa fallback)
             if ESSENTIA_AVAILABLE:
-                logger.debug("Using Essentia-based feature extractors for improved accuracy")
+                self.feature_extractors.append(EssentiaSpectralFeatureExtractor())
+                # Skip HPSS when using Essentia spectral features (better & faster)
+                logger.debug("Using Essentia-based feature extractors (skipping HPSS)")
             else:
-                logger.debug("Using librosa-based feature extractors (Essentia not available)")
+                # Use HPSS + librosa spectral when Essentia not available
+                self.feature_extractors.append(HPSSFeatureExtractor())
+                self.feature_extractors.append(SpectralFeatureExtractor())
+                logger.debug("Using librosa-based feature extractors with HPSS")
+            
+            # Add onset detector (Essentia preferred, librosa fallback)
+            if ESSENTIA_AVAILABLE:
+                self.feature_extractors.append(EssentiaOnsetFeatureExtractor())
+            else:
+                self.feature_extractors.append(OnsetFeatureExtractor())
         else:
             self.feature_extractors = feature_extractors
 
@@ -415,7 +430,7 @@ class AudioAnalyzer:
 
         # Detect tempo and beats
         logger.debug("Detecting tempo and beats...")
-        
+
         # Try essentia first (best for EDM), then aubio, then librosa
         if ESSENTIA_AVAILABLE:
             try:
@@ -436,7 +451,7 @@ class AudioAnalyzer:
                 bpm, beats = self._detect_bpm_librosa(y, sr)
         else:
             bpm, beats = self._detect_bpm_librosa(y, sr)
-        
+
         beat_times = librosa.frames_to_time(beats, sr=sr)
 
         # Calculate bar duration (4 beats per bar)
@@ -551,7 +566,9 @@ class AudioAnalyzer:
             max_energy_threshold = max_energy * self.config.drop_max_energy_threshold
 
             # Calculate lookback frames based on seconds
-            lookback_frames = int(self.config.drop_lookback_seconds / self.config.energy_window_seconds)
+            lookback_frames = int(
+                self.config.drop_lookback_seconds / self.config.energy_window_seconds
+            )
 
             # Look for strong onsets that coincide with high energy
             for onset_time in onset_times:
@@ -584,7 +601,7 @@ class AudioAnalyzer:
                         if energy[j] < recent_avg * 1.05:  # Found the base before the rise
                             onset_search_idx = j + 1
                             break
-                    
+
                     drops.append(float(times[onset_search_idx]))
                     logger.debug(
                         "Drop detected at %.2fs (onset: %.2fs, peak: %.2fs)",
@@ -595,7 +612,9 @@ class AudioAnalyzer:
         else:
             # Fallback to energy-based detection
             energy_std_threshold = mean_energy + std_energy * self.config.drop_energy_std
-            lookback_frames = int(self.config.drop_lookback_seconds / self.config.energy_window_seconds)
+            lookback_frames = int(
+                self.config.drop_lookback_seconds / self.config.energy_window_seconds
+            )
 
             for i in range(lookback_frames, len(energy) - 5):
                 recent_avg = np.mean(energy[max(0, i - lookback_frames) : i])
@@ -607,9 +626,8 @@ class AudioAnalyzer:
                 ):  # Slightly stricter for fallback
                     window_start = max(0, i - 2)
                     window_end = min(len(energy), i + 3)
-                    if (
-                        energy[i] == np.max(energy[window_start:window_end])
-                        and (not drops or (times[i] - drops[-1]) > min_spacing)
+                    if energy[i] == np.max(energy[window_start:window_end]) and (
+                        not drops or (times[i] - drops[-1]) > min_spacing
                     ):
                         # Use the onset (start of jump) rather than the peak
                         onset_idx = i
@@ -631,7 +649,7 @@ class AudioAnalyzer:
     ) -> list[float]:
         """
         Detect breakdown points using combined energy and available features.
-        
+
         Uses spectral complexity and HFC from Essentia if available for better accuracy.
 
         Args:
@@ -651,7 +669,7 @@ class AudioAnalyzer:
         # Check for Essentia spectral features (best for breakdown detection)
         use_spectral = "spectral_complexity" in features and "hfc" in features
         use_hpss = "harmonic_energy" in features and "percussive_energy" in features
-        
+
         if use_spectral:
             logger.debug("Breakdown detection mode: Essentia spectral-based")
         elif use_hpss:
@@ -663,30 +681,33 @@ class AudioAnalyzer:
         if use_spectral:
             spectral_complexity = features["spectral_complexity"]
             hfc = features["hfc"]
-            
+
             # Align spectral features with energy curve
             # Spectral features may have different frame count, interpolate if needed
             if len(spectral_complexity) != len(energy):
                 from scipy import interpolate
-                old_indices = np.linspace(0, len(times)-1, len(spectral_complexity))
+
+                old_indices = np.linspace(0, len(times) - 1, len(spectral_complexity))
                 new_indices = np.arange(len(times))
-                f_complexity = interpolate.interp1d(old_indices, spectral_complexity,
-                                                    kind='linear', fill_value='extrapolate')
-                f_hfc = interpolate.interp1d(old_indices, hfc,
-                                            kind='linear', fill_value='extrapolate')
+                f_complexity = interpolate.interp1d(
+                    old_indices, spectral_complexity, kind="linear", fill_value="extrapolate"
+                )
+                f_hfc = interpolate.interp1d(
+                    old_indices, hfc, kind="linear", fill_value="extrapolate"
+                )
                 spectral_complexity = f_complexity(new_indices)
                 hfc = f_hfc(new_indices)
-            
+
             mean_complexity = np.mean(spectral_complexity)
             mean_hfc = np.mean(hfc)
-            
+
             # Breakdowns have low complexity and low HFC
             complexity_threshold = mean_complexity * 0.7
             hfc_threshold = mean_hfc * 0.6
             energy_threshold = min(
                 max_energy * self.config.breakdown_energy_threshold, mean_energy * 0.85
             )
-            
+
         elif use_hpss:
             harmonic_energy = features["harmonic_energy"]
             percussive_energy = features["percussive_energy"]
@@ -718,9 +739,9 @@ class AudioAnalyzer:
             if use_spectral:
                 # Essentia-based: low energy + low complexity + low HFC = breakdown
                 is_breakdown_like = (
-                    energy[i] < energy_threshold and
-                    spectral_complexity[i] < complexity_threshold and
-                    hfc[i] < hfc_threshold
+                    energy[i] < energy_threshold
+                    and spectral_complexity[i] < complexity_threshold
+                    and hfc[i] < hfc_threshold
                 )
             elif use_hpss:
                 is_breakdown_like = energy[i] < energy_threshold and (
@@ -741,10 +762,12 @@ class AudioAnalyzer:
                     breakdown_avg = np.mean(energy[breakdown_start_idx:i])
 
                     valid_breakdown = breakdown_avg < mean_energy * 0.9
-                    
+
                     if use_spectral:
                         # Essentia validation: breakdown region should have low complexity
-                        breakdown_complexity_avg = np.mean(spectral_complexity[breakdown_start_idx:i])
+                        breakdown_complexity_avg = np.mean(
+                            spectral_complexity[breakdown_start_idx:i]
+                        )
                         valid_breakdown = valid_breakdown and (
                             breakdown_complexity_avg < mean_complexity * 0.8
                         )
@@ -802,21 +825,21 @@ class AudioAnalyzer:
     def _detect_bpm_librosa(self, y: np.ndarray, sr: int) -> tuple[float, np.ndarray]:
         """
         Detect BPM using librosa's beat tracker.
-        
+
         Args:
             y: Audio time series
             sr: Sample rate
-            
+
         Returns:
             Tuple of (bpm, beat_frames)
         """
         tempo, beats = librosa.beat.beat_track(y=y, sr=sr)
         bpm = float(tempo)
-        
+
         # Refine BPM - check for common rounding issues and half/double time
         # Round to nearest 0.5 BPM for common tempo grid alignment
         bpm_rounded = round(bpm * 2) / 2
-        
+
         # Check if we're detecting half-time or double-time
         # For EDM, common range is 120-150 BPM
         if bpm_rounded < 100 and bpm_rounded * 2 >= 120 and bpm_rounded * 2 <= 150:
@@ -835,18 +858,20 @@ class AudioAnalyzer:
         return bpm, beats
 
     @timed("BPM detection (Essentia)")
-    def _detect_bpm_essentia(self, audio_path: Path, y: np.ndarray, sr: int) -> tuple[float, np.ndarray]:
+    def _detect_bpm_essentia(
+        self, audio_path: Path, y: np.ndarray, sr: int
+    ) -> tuple[float, np.ndarray]:
         """
         Detect BPM using essentia's RhythmExtractor2013 (best for EDM).
-        
+
         This uses the winning algorithm from MIREX 2013 beat tracking competition,
         optimized for electronic dance music with steady 4/4 rhythms.
-        
+
         Args:
             audio_path: Path to audio file
             y: Audio time series
             sr: Sample rate
-            
+
         Returns:
             Tuple of (bpm, beat_frames)
         """
@@ -854,24 +879,28 @@ class AudioAnalyzer:
         if y.ndim > 1:
             y = np.mean(y, axis=1)
         y = y.astype(np.float32)
-        
+
         # Use RhythmExtractor2013 - multifeature method (best for EDM)
         rhythm_extractor = es.RhythmExtractor2013(method="multifeature")
         bpm_raw, beat_times, beat_confidence, _, beat_intervals = rhythm_extractor(y)
-        
+
         if len(beat_times) < 2:
             raise ValueError("Essentia detected fewer than 2 beats")
-        
+
         # Refine BPM - check for common rounding issues and half/double time
         bpm_rounded = round(bpm_raw * 2) / 2
-        
+
         # Check if we're detecting half-time or double-time
         # For EDM, common range is 120-150 BPM
         if bpm_rounded < 100 and bpm_rounded * 2 >= 120 and bpm_rounded * 2 <= 150:
-            logger.debug("Detected half-time tempo, doubling: %.1f -> %.1f", bpm_raw, bpm_rounded * 2)
+            logger.debug(
+                "Detected half-time tempo, doubling: %.1f -> %.1f", bpm_raw, bpm_rounded * 2
+            )
             bpm = bpm_rounded * 2
         elif bpm_rounded > 160 and bpm_rounded / 2 >= 120 and bpm_rounded / 2 <= 150:
-            logger.debug("Detected double-time tempo, halving: %.1f -> %.1f", bpm_raw, bpm_rounded / 2)
+            logger.debug(
+                "Detected double-time tempo, halving: %.1f -> %.1f", bpm_raw, bpm_rounded / 2
+            )
             bpm = bpm_rounded / 2
         else:
             bpm = bpm_rounded
@@ -879,60 +908,64 @@ class AudioAnalyzer:
         if bpm < 60 or bpm > 200:
             raise ValueError(f"Detected BPM {bpm:.1f} outside valid range (60-200)")
 
-        logger.debug("Detected BPM (essentia): %.1f (confidence: %.2f)", bpm, np.mean(beat_confidence))
-        
+        logger.debug(
+            "Detected BPM (essentia): %.1f (confidence: %.2f)", bpm, np.mean(beat_confidence)
+        )
+
         # Convert beat times to frames for consistency with librosa
         beat_frames = librosa.time_to_frames(beat_times, sr=sr)
-        
+
         return bpm, beat_frames
 
     @timed("BPM detection (Aubio)")
-    def _detect_bpm_aubio(self, audio_path: Path, y: np.ndarray, sr: int) -> tuple[float, np.ndarray]:
+    def _detect_bpm_aubio(
+        self, audio_path: Path, y: np.ndarray, sr: int
+    ) -> tuple[float, np.ndarray]:
         """
         Detect BPM using aubio's beat tracking (better than librosa).
-        
+
         Args:
             audio_path: Path to audio file
             y: Audio time series
             sr: Sample rate
-            
+
         Returns:
             Tuple of (bpm, beat_frames)
         """
         # Aubio parameters
         hop_size = 512
         win_s = 1024
-        
+
         # Create tempo detection object
         tempo = aubio.tempo("default", win_s, hop_size, sr)
-        
+
         # Process audio in chunks
         beat_times = []
         n_samples = len(y)
         for i in range(0, n_samples, hop_size):
             # Get audio chunk
-            chunk = y[i:i + hop_size]
+            chunk = y[i : i + hop_size]
             if len(chunk) < hop_size:
                 chunk = np.pad(chunk, (0, hop_size - len(chunk)))
-            
+
             # Detect beat
             is_beat = tempo(chunk.astype(np.float32))
             if is_beat:
                 beat_time = tempo.get_last_s()
                 beat_times.append(beat_time)
-        
+
         if len(beat_times) < 2:
             raise ValueError("Aubio detected fewer than 2 beats")
-        
+
         # Calculate BPM from beat intervals
         beat_times = np.array(beat_times)
         intervals = np.diff(beat_times)
         median_interval = np.median(intervals)
         bpm = 60.0 / median_interval
-        
+
         # Refine BPM - check for common rounding issues and half/double time
         bpm_rounded = round(bpm * 2) / 2
-        
+
         # Check if we're detecting half-time or double-time
         # For EDM, common range is 120-150 BPM
         if bpm_rounded < 100 and bpm_rounded * 2 >= 120 and bpm_rounded * 2 <= 150:
@@ -948,10 +981,10 @@ class AudioAnalyzer:
             raise ValueError(f"Detected BPM {bpm:.1f} outside valid range (60-200)")
 
         logger.debug("Detected BPM (aubio): %.1f", bpm)
-        
+
         # Convert beat times to frames for consistency with librosa
         beat_frames = librosa.time_to_frames(beat_times, sr=sr)
-        
+
         return bpm, beat_frames
 
 

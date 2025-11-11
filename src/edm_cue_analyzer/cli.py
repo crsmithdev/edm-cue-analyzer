@@ -16,7 +16,11 @@ logger = logging.getLogger(__name__)
 
 
 async def analyze_track(
-    filepath: Path, config: Config, output_xml: Path | None = None, display: bool = True, bpm_only: bool = False
+    filepath: Path,
+    config: Config,
+    output_xml: Path | None = None,
+    display: bool = True,
+    bpm_only: bool = False,
 ) -> int:
     """
     Analyze a single track and generate cues.
@@ -36,17 +40,17 @@ async def analyze_track(
 
         # Analyze audio
         analyzer = AudioAnalyzer(config.analysis)
-        
+
         if bpm_only:
             # Just detect BPM
             structure = await analyzer.analyze_file(filepath)
-            print(f"\n{'='*80}\n")
+            print(f"\n{'=' * 80}\n")
             print(f"Track: {filepath}")
             print(f"BPM: {structure.bpm:.1f}")
             print(f"Duration: {int(structure.duration // 60)}:{int(structure.duration % 60):02d}")
-            print(f"\n{'='*80}\n")
+            print(f"\n{'=' * 80}\n")
             return 0
-        
+
         structure = await analyzer.analyze_file(filepath)
 
         # Generate cues
@@ -110,18 +114,12 @@ Examples:
     parser.add_argument(
         "--no-display", action="store_true", help="Disable terminal display of results"
     )
-    
-    parser.add_argument(
-        "--bpm-only",
-        action="store_true",
-        help="Only detect and display BPM (skip full analysis)"
-    )
 
     parser.add_argument(
-        "--verbose",
-        action="store_true",
-        help="Enable verbose debug logging"
+        "--bpm-only", action="store_true", help="Only detect and display BPM (skip full analysis)"
     )
+
+    parser.add_argument("--verbose", action="store_true", help="Enable verbose debug logging")
 
     parser.add_argument("-v", "--version", action="version", version="EDM Cue Analyzer 1.0.0")
 
@@ -135,10 +133,10 @@ Examples:
         else "%(levelname)s: %(message)s"
     )
     logging.basicConfig(level=log_level, format=log_format)
-    
+
     # Set log level for edm_cue_analyzer package
     logging.getLogger("edm_cue_analyzer").setLevel(log_level)
-    
+
     # Suppress overly verbose libraries
     logging.getLogger("numba").setLevel(logging.WARNING)
     logging.getLogger("matplotlib").setLevel(logging.WARNING)
@@ -157,7 +155,13 @@ Examples:
 
     # Analyze track
     return asyncio.run(
-        analyze_track(args.input, config, output_xml=args.output, display=not args.no_display, bpm_only=args.bpm_only)
+        analyze_track(
+            args.input,
+            config,
+            output_xml=args.output,
+            display=not args.no_display,
+            bpm_only=args.bpm_only,
+        )
     )
 
 
