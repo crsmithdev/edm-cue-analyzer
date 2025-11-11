@@ -2,17 +2,53 @@
 
 import asyncio
 import logging
+import time
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
+from functools import wraps
 from pathlib import Path
 
 import librosa
 import numpy as np
-from scipy import interpolate
 
 from .config import AnalysisConfig
 
 logger = logging.getLogger(__name__)
+
+
+def timed(operation_name: str = None):
+    """Decorator to time functions and log performance."""
+    def decorator(func):
+        @wraps(func)
+        def sync_wrapper(*args, **kwargs):
+            name = operation_name or func.__name__
+            start = time.perf_counter()
+            try:
+                result = func(*args, **kwargs)
+                elapsed = time.perf_counter() - start
+                logger.info(f"⏱️  {name}: {elapsed:.2f}s")
+                return result
+            except Exception as e:
+                elapsed = time.perf_counter() - start
+                logger.error(f"⏱️  {name}: {elapsed:.2f}s (failed: {e})")
+                raise
+
+        @wraps(func)
+        async def async_wrapper(*args, **kwargs):
+            name = operation_name or func.__name__
+            start = time.perf_counter()
+            try:
+                result = await func(*args, **kwargs)
+                elapsed = time.perf_counter() - start
+                logger.info(f"⏱️  {name}: {elapsed:.2f}s")
+                return result
+            except Exception as e:
+                elapsed = time.perf_counter() - start
+                logger.error(f"⏱️  {name}: {elapsed:.2f}s (failed: {e})")
+                raise
+
+        return async_wrapper if asyncio.iscoroutinefunction(func) else sync_wrapper
+    return decorator
 
 # Try to import essentia for best beat tracking (especially for EDM)
 try:
@@ -96,6 +132,7 @@ class HPSSFeatureExtractor(FeatureExtractor):
     def name(self) -> str:
         return "hpss"
 
+    @timed("HPSS feature extraction")
     def extract(self, y: np.ndarray, sr: int, **kwargs) -> dict[str, np.ndarray]:
         """Extract harmonic and percussive components."""
         y_harmonic, y_percussive = librosa.effects.hpss(y)
@@ -120,6 +157,7 @@ class SpectralFeatureExtractor(FeatureExtractor):
     def name(self) -> str:
         return "spectral"
 
+    @timed("Spectral features (librosa)")
     def extract(self, y: np.ndarray, sr: int, **kwargs) -> dict[str, np.ndarray]:
         """Extract spectral features."""
         features = {}
@@ -152,6 +190,7 @@ class OnsetFeatureExtractor(FeatureExtractor):
     def name(self) -> str:
         return "onset"
 
+    @timed("Onset detection (librosa)")
     def extract(self, y: np.ndarray, sr: int, **kwargs) -> dict[str, np.ndarray]:
         """Extract onset strength envelope and onset times."""
         # Onset strength envelope - shows likelihood of new events
@@ -178,6 +217,7 @@ class EssentiaOnsetFeatureExtractor(FeatureExtractor):
     def name(self) -> str:
         return "onset"
 
+    @timed("Onset detection (Essentia)")
     def extract(self, y: np.ndarray, sr: int, **kwargs) -> dict[str, np.ndarray]:
         """Extract onset features using Essentia's onset detection."""
         if not ESSENTIA_AVAILABLE:
@@ -237,6 +277,7 @@ class EssentiaSpectralFeatureExtractor(FeatureExtractor):
     def name(self) -> str:
         return "spectral"
 
+    @timed("Spectral features (Essentia)")
     def extract(self, y: np.ndarray, sr: int, **kwargs) -> dict[str, np.ndarray]:
         """Extract spectral features using Essentia."""
         if not ESSENTIA_AVAILABLE:
@@ -341,6 +382,7 @@ class AudioAnalyzer:
             self.feature_extractors.remove(extractor)
             del self.extractors_by_name[name]
 
+    @timed("Total track analysis")
     async def analyze(self, audio_path: Path) -> TrackStructure:
         """
         Analyze an audio file to extract structure.
@@ -360,8 +402,11 @@ class AudioAnalyzer:
 
         logger.debug("Loading audio file: %s", audio_path)
         # Load audio file (librosa.load is I/O bound, run in executor)
+        load_start = time.perf_counter()
         y, sr = await asyncio.to_thread(librosa.load, str(audio_path))
         duration = librosa.get_duration(y=y, sr=sr)
+        load_time = time.perf_counter() - load_start
+        logger.info(f"⏱️  Audio loading: {load_time:.2f}s")
         logger.debug("Audio loaded: duration=%.2fs, sample_rate=%d", duration, sr)
 
         # Validate minimum duration
@@ -462,6 +507,7 @@ class AudioAnalyzer:
         logger.debug("Energy curve calculated: %d points", len(rms))
         return times, rms
 
+    @timed("Drop detection")
     def _detect_drops(
         self,
         energy: np.ndarray,
@@ -575,6 +621,7 @@ class AudioAnalyzer:
 
         return drops
 
+    @timed("Breakdown detection")
     def _detect_breakdowns(
         self,
         energy: np.ndarray,
@@ -623,9 +670,9 @@ class AudioAnalyzer:
                 from scipy import interpolate
                 old_indices = np.linspace(0, len(times)-1, len(spectral_complexity))
                 new_indices = np.arange(len(times))
-                f_complexity = interpolate.interp1d(old_indices, spectral_complexity, 
+                f_complexity = interpolate.interp1d(old_indices, spectral_complexity,
                                                     kind='linear', fill_value='extrapolate')
-                f_hfc = interpolate.interp1d(old_indices, hfc, 
+                f_hfc = interpolate.interp1d(old_indices, hfc,
                                             kind='linear', fill_value='extrapolate')
                 spectral_complexity = f_complexity(new_indices)
                 hfc = f_hfc(new_indices)
@@ -716,6 +763,7 @@ class AudioAnalyzer:
 
         return breakdowns
 
+    @timed("Build detection")
     def _detect_builds(
         self, energy: np.ndarray, times: np.ndarray, features: dict[str, np.ndarray]
     ) -> list[float]:
@@ -750,6 +798,7 @@ class AudioAnalyzer:
 
         return builds
 
+    @timed("BPM detection (librosa)")
     def _detect_bpm_librosa(self, y: np.ndarray, sr: int) -> tuple[float, np.ndarray]:
         """
         Detect BPM using librosa's beat tracker.
@@ -785,6 +834,7 @@ class AudioAnalyzer:
         logger.debug("Detected BPM (librosa): %.1f", bpm)
         return bpm, beats
 
+    @timed("BPM detection (Essentia)")
     def _detect_bpm_essentia(self, audio_path: Path, y: np.ndarray, sr: int) -> tuple[float, np.ndarray]:
         """
         Detect BPM using essentia's RhythmExtractor2013 (best for EDM).
@@ -836,6 +886,7 @@ class AudioAnalyzer:
         
         return bpm, beat_frames
 
+    @timed("BPM detection (Aubio)")
     def _detect_bpm_aubio(self, audio_path: Path, y: np.ndarray, sr: int) -> tuple[float, np.ndarray]:
         """
         Detect BPM using aubio's beat tracking (better than librosa).
