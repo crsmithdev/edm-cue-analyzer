@@ -1,0 +1,70 @@
+{
+  "name": "EDM Cue Analyzer",
+  "build": {
+    "dockerfile": "Dockerfile",
+    "context": ".."
+  },
+  
+  // Configure container features
+  "features": {
+    "ghcr.io/devcontainers/features/git:1": {},
+    "ghcr.io/devcontainers/features/common-utils:2": {
+      "installZsh": true,
+      "installOhMyZsh": true
+    }
+  },
+
+  // VS Code customizations
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "ms-python.python",
+        "ms-python.pylance",
+        "ms-python.vscode-pylance",
+        "charliermarsh.ruff",
+        "ms-python.debugpy",
+        "tamasfe.even-better-toml"
+      ],
+      "settings": {
+        "python.defaultInterpreterPath": "/usr/local/bin/python",
+        "python.linting.enabled": true,
+        "python.linting.pylintEnabled": false,
+        "python.formatting.provider": "none",
+        "editor.formatOnSave": true,
+        "editor.codeActionsOnSave": {
+          "source.organizeImports": "explicit"
+        },
+        "[python]": {
+          "editor.formatOnSave": true
+        },
+        "python.testing.pytestEnabled": true,
+        "python.testing.unittestEnabled": false,
+        "files.exclude": {
+          "**/__pycache__": true,
+          "**/*.pyc": true,
+          "**/.pytest_cache": true,
+          "**/.coverage": true,
+          "**/htmlcov": true,
+          "**/*.egg-info": true
+        }
+      }
+    }
+  },
+
+  // Mount audio files directory
+  "mounts": [
+    "source=${localWorkspaceFolder}/tests,target=/workspace/tests,type=bind,consistency=cached"
+  ],
+
+  // Forward ports for any web interfaces you might add later
+  "forwardPorts": [8000, 5000],
+
+  // Run commands after container is created
+  "postCreateCommand": "pip install -e .[dev]",
+
+  // Keep container running for better performance
+  "shutdownAction": "stopContainer",
+
+  // Run as non-root user for security
+  "remoteUser": "vscode"
+}

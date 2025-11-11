@@ -84,8 +84,10 @@ memory_cues:
 
 # Analysis Parameters
 analysis:
+# Analysis parameters
+analysis:
   # Energy detection
-  energy_window_seconds: 5.0
+  energy_window_seconds: 0.25  # Finer resolution for more accurate timing (was 1.0)
   energy_threshold_increase: 0.15  # 15% increase indicates build/riser
   
   # Spectral analysis
@@ -94,8 +96,24 @@ analysis:
   
   # Structure detection
   min_section_duration: 8.0  # seconds
-  drop_energy_multiplier: 1.3  # Drop should be 30% higher energy than baseline
+  
+  # Drop detection
+  drop_energy_multiplier: 1.3  # Drop should be 30% higher energy than recent average
+  drop_onset_strength_std: 1.2  # Standard deviations above mean for onset detection (was 1.5, more sensitive)
+  drop_energy_std: 0.5  # Standard deviations above mean for energy (was 0.7, more sensitive)
+  drop_max_energy_threshold: 0.55  # Must be in top 45% of track energy (was 0.60, more sensitive)
+  drop_min_spacing_bars: 28  # Minimum bars between detected drops (avoid duplicates)
+  drop_lookback_seconds: 5.0  # How far back to look for energy average (was 10 frames)
+  
+  # Breakdown detection
   breakdown_energy_threshold: 0.6  # Breakdown should be 60% or less of max energy
+  breakdown_min_duration_bars: 4  # Must last at least 4 bars
+  breakdown_min_spacing_bars: 16  # Minimum bars between breakdowns
+  breakdown_perc_threshold: 0.6  # Percussive energy threshold (HPSS)
+  breakdown_ratio_threshold: 1.1  # Harmonic/percussive ratio threshold (HPSS)
+  
+  # Build detection
+  build_window_size: 20  # Number of energy samples to check for sustained increase (was 5, now adjusted for 0.25s windows)
 
 # Rekordbox XML Export
 rekordbox:
