@@ -9,12 +9,70 @@ import time
 from pathlib import Path
 
 from .analyzer import AudioAnalyzer
-from .config import Config, load_config
+from .config import Config, get_default_config, load_config
 from .cue_generator import CueGenerator
 from .display import display_results
 from .rekordbox import export_to_rekordbox
 
 logger = logging.getLogger(__name__)
+
+
+def _format_time(seconds: float) -> str:
+    """Format seconds as MM:SS."""
+    return f"{int(seconds // 60)}:{int(seconds % 60):02d}"
+
+
+def _print_summary(filepath: Path, structure, cues: list, elapsed: float, verbose: bool = False):
+    """
+    Print analysis summary to stdout (output, not logs).
+
+    Args:
+        filepath: Audio file path
+        structure: TrackStructure object
+        cues: List of generated cue points
+        elapsed: Analysis time in seconds
+        verbose: Whether to show detailed output
+    """
+    # Basic info always shown
+    print(f"\n{'=' * 80}")
+    print(f"Track: {filepath.name}")
+    print(f"BPM: {structure.bpm:.1f} | Duration: {_format_time(structure.duration)}")
+
+    # Structure summary
+    if structure.drops:
+        drop_times = ", ".join([_format_time(d) for d in structure.drops])
+        print(f"Drops ({len(structure.drops)}): {drop_times}")
+    else:
+        print("Drops: None detected")
+
+    if structure.breakdowns:
+        breakdown_times = ", ".join([_format_time(b) for b in structure.breakdowns])
+        print(f"Breakdowns ({len(structure.breakdowns)}): {breakdown_times}")
+    else:
+        print("Breakdowns: None detected")
+
+    if structure.builds:
+        build_times = ", ".join([_format_time(b) for b in structure.builds])
+        print(f"Builds ({len(structure.builds)}): {build_times}")
+    else:
+        print("Builds: None detected")
+
+    # Cue summary
+    hot_cues = [c for c in cues if c.cue_type == "hot"]
+    memory_cues = [c for c in cues if c.cue_type == "memory"]
+    print(f"Cues: {len(hot_cues)} hot, {len(memory_cues)} memory")
+
+    if verbose:
+        # Show cue details
+        print("\nGenerated Cues:")
+        for cue in sorted(hot_cues, key=lambda x: x.hot_cue_number):
+            cue_id = chr(65 + cue.hot_cue_number)  # A-H
+            time_str = _format_time(cue.position)
+            loop_str = f"{cue.loop_length:.1f}s" if cue.loop_length else "N/A"
+            print(f"  {cue_id} - {cue.label:<20} @ {time_str:<8} Loop: {loop_str:<8} [{cue.color}]")
+
+    print(f"Analysis time: {elapsed:.2f}s")
+    print(f"{'=' * 80}\n")
 
 
 async def analyze_track(
@@ -46,16 +104,13 @@ async def analyze_track(
         Tuple of (exit_code, elapsed_time)
     """
     start_time = time.perf_counter()
-    
+
     try:
-        # Progress prefix
-        progress = f"[{track_num}/{total_tracks}] " if track_num and total_tracks else ""
-        
-        if verbose:
-            logger.info("%sAnalyzing: %s", progress, filepath)
+        # Progress to stderr (logs)
+        if track_num and total_tracks:
+            logger.info("Analyzing [%d/%d]: %s", track_num, total_tracks, filepath.name)
         else:
-            # Compact progress for non-verbose
-            print(f"{progress}Analyzing: {filepath.name}...", end=" ", flush=True)
+            logger.info("Analyzing: %s", filepath.name)
 
         # Analyze audio
         analyzer = AudioAnalyzer(config.analysis)
@@ -64,17 +119,11 @@ async def analyze_track(
             # Just detect BPM
             structure = await analyzer.analyze_file(filepath)
             elapsed = time.perf_counter() - start_time
-            
-            if verbose:
-                print(f"\n{'=' * 80}\n")
-                print(f"Track: {filepath}")
-                print(f"BPM: {structure.bpm:.1f}")
-                print(f"Duration: {int(structure.duration // 60)}:{int(structure.duration % 60):02d}")
-                print(f"Analysis time: {elapsed:.2f}s")
-                print(f"\n{'=' * 80}\n")
-            else:
-                print(f"BPM: {structure.bpm:.1f} ({elapsed:.1f}s)")
-            
+
+            # Output to stdout
+            print(f"\nBPM: {structure.bpm:.1f} | Duration: {_format_time(structure.duration)}")
+            print(f"Analysis time: {elapsed:.2f}s\n")
+
             return 0, elapsed
 
         structure = await analyzer.analyze_file(filepath)
@@ -82,39 +131,37 @@ async def analyze_track(
         # Generate cues
         generator = CueGenerator(config)
         cues = generator.generate_cues(structure)
-        
+
         elapsed = time.perf_counter() - start_time
 
-        # Display results
-        if display and verbose:
-            display_results(
-                str(filepath),
-                structure,
-                cues,
-                color_enabled=config.display.get("color_enabled", True),
-                waveform_width=config.display.get("waveform_width", 80),
-            )
-        elif not verbose:
-            # Compact summary
-            print(f"✓ BPM: {structure.bpm:.1f}, Drops: {len(structure.drops)}, "
-                  f"Breakdowns: {len(structure.breakdowns)} ({elapsed:.1f}s)")
+        # Output results to stdout
+        if display:
+            if verbose:
+                # Full detailed display with colors
+                display_results(
+                    str(filepath),
+                    structure,
+                    cues,
+                    color_enabled=config.display.get("color_enabled", True),
+                    waveform_width=config.display.get("waveform_width", 80),
+                )
+            else:
+                # Clean summary
+                _print_summary(filepath, structure, cues, elapsed, verbose=False)
 
         # Export to XML if requested
         if output_xml:
             export_to_rekordbox(
                 filepath, cues, structure, output_xml, color_mapping=config.rekordbox_colors
             )
-            if verbose:
-                print(f"\n✓ Exported to: {output_xml}\n")
+            logger.info("Exported to: %s", output_xml)
 
         return 0, elapsed
 
     except Exception as e:
         elapsed = time.perf_counter() - start_time
-        if verbose:
-            logger.error("Error analyzing %s: %s", filepath, e, exc_info=True)
-        else:
-            print(f"✗ Error: {e}")
+        logger.error("Error analyzing %s: %s", filepath, e, exc_info=True)
+        print(f"\n✗ Error: {e}\n", file=sys.stderr)
         return 1, elapsed
 
 
@@ -144,14 +191,13 @@ async def batch_analyze(
     """
     total_files = len(files)
     batch_start = time.perf_counter()
-    
-    print(f"\n{'=' * 80}")
-    print(f"Analyzing {total_files} track{'s' if total_files != 1 else ''}")
-    print(f"{'=' * 80}\n")
-    
+
+    # Batch header to stderr (logs)
+    logger.info("Starting batch analysis of %d track(s)", total_files)
+
     results = []
     errors = 0
-    
+
     for i, filepath in enumerate(files, 1):
         exit_code, elapsed = await analyze_track(
             filepath,
@@ -164,26 +210,31 @@ async def batch_analyze(
             track_num=i,
             total_tracks=total_files,
         )
-        
+
         results.append((filepath, exit_code, elapsed))
         if exit_code != 0:
             errors += 1
-    
+
     batch_elapsed = time.perf_counter() - batch_start
-    
-    # Summary
-    print(f"\n{'=' * 80}")
-    print(f"Batch complete: {total_files - errors}/{total_files} successful")
-    print(f"Total time: {batch_elapsed:.1f}s | Avg: {batch_elapsed/total_files:.1f}s/track")
-    print(f"{'=' * 80}\n")
-    
-    if verbose and results:
-        print("\nPer-file timing:")
-        for filepath, exit_code, elapsed in results:
-            status = "✓" if exit_code == 0 else "✗"
-            print(f"  {status} {filepath.name}: {elapsed:.2f}s")
-        print()
-    
+
+    # Batch summary to stdout (output)
+    if total_files > 1:
+        print(f"\n{'=' * 80}")
+        print("Batch Summary")
+        print(f"{'=' * 80}")
+        print(f"Completed: {total_files - errors}/{total_files} successful")
+        print(f"Total time: {batch_elapsed:.1f}s | Avg: {batch_elapsed / total_files:.1f}s/track")
+
+        if verbose and results:
+            print("\nPer-file timing:")
+            for filepath, exit_code, elapsed in results:
+                status = "✓" if exit_code == 0 else "✗"
+                print(f"  {status} {filepath.name}: {elapsed:.2f}s")
+
+        print(f"{'=' * 80}\n")
+
+    logger.info("Batch analysis complete: %d/%d successful", total_files - errors, total_files)
+
     return 1 if errors > 0 else 0
 
 
@@ -256,11 +307,11 @@ Examples:
         else "%(levelname)s: %(message)s"
     )
 
-    # Setup logging handlers
-    handlers = [logging.StreamHandler(sys.stdout)]
+    # Setup logging handlers - logs go to stderr, output goes to stdout
+    handlers = [logging.StreamHandler(sys.stderr)]
     if args.log_file:
         # Append to log file
-        file_handler = logging.FileHandler(args.log_file, mode='a')
+        file_handler = logging.FileHandler(args.log_file, mode="a")
         file_handler.setFormatter(logging.Formatter(log_format))
         handlers.append(file_handler)
 
@@ -288,7 +339,7 @@ Examples:
             else:
                 logger.error("File not found: %s", pattern)
                 return 1
-    
+
     # Remove duplicates, keep order
     seen = set()
     unique_files = []
@@ -297,7 +348,7 @@ Examples:
             seen.add(f)
             unique_files.append(f)
     files = unique_files
-    
+
     if not files:
         logger.error("No files to analyze")
         return 1

@@ -1,0 +1,46 @@
+{
+    "tracks": [
+        {
+            "filename": "Cristoph - Come With Me.flac",
+            "duration_seconds": 191,
+            "bpm": 123.0,
+            "manual_labels": {
+                "drops": [
+                    15,
+                    93,
+                    156
+                ],
+                "breakdowns": [
+                    31
+                ],
+                "builds": [],
+                "notes": "Build between breakdown at 31s and drop at 1m33s (93s), but exact start unclear"
+            },
+            "detected": {
+                "drops": [
+                    15.75,
+                    82.75
+                ],
+                "breakdowns": [],
+                "builds": []
+            },
+            "evaluation": {
+                "drops": {
+                    "true_positives": 1,
+                    "false_positives": 0,
+                    "false_negatives": 2,
+                    "notes": "Detected first drop at 15.75s (manual: 15s) ✓. Missed drop at 93s. Missed drop at 156s. Detected spurious drop at 82.75s."
+                },
+                "breakdowns": {
+                    "true_positives": 0,
+                    "false_positives": 0,
+                    "false_negatives": 1,
+                    "notes": "Missed breakdown at 31s."
+                },
+                "builds": {
+                    "notes": "No builds detected, manual labels also unclear on build timing."
+                }
+            }
+        }
+    ]
+}

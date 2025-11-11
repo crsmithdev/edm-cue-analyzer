@@ -4,7 +4,6 @@
     "dockerfile": "Dockerfile",
     "context": ".."
   },
-  
   // Configure container features
   "features": {
     "ghcr.io/devcontainers/features/git:1": {},
@@ -13,7 +12,6 @@
       "installOhMyZsh": true
     }
   },
-
   // VS Code customizations
   "customizations": {
     "vscode": {
@@ -50,23 +48,21 @@
       }
     }
   },
-
   // Mount audio files directory
   "mounts": [
     "source=${localWorkspaceFolder}/tests,target=/workspace/tests,type=bind,consistency=cached",
     // Mount Windows Music Library for analysis
     "source=C:\\Music\\Library,target=/music,type=bind,consistency=cached"
   ],
-
   // Forward ports for any web interfaces you might add later
-  "forwardPorts": [8000, 5000],
-
+  "forwardPorts": [
+    8000,
+    5000
+  ],
   // Run commands after container is created
   "postCreateCommand": "pip install -e .[dev]",
-
   // Keep container running for better performance
   "shutdownAction": "stopContainer",
-
   // Run as non-root user for security
   "remoteUser": "vscode"
 }

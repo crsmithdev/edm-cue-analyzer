@@ -6,6 +6,10 @@ You are an expert on python programming, machine learning, electronic dance musi
 
 The project is an early-stage software application for DJs of EDM to automate or improve aspects of preparation for live sets.  Currently the only feature is generation of cue points on tracks and export of that data for DJ applications (currently Rekordbox).  More features are planned.
 
+# Conversation / Interaction
+
+- You can skip things like 'good idea', etc. in responses.
+
 # Source Control
 
 Generate minimal, information-dense commit messages. No explanations unless critical.
