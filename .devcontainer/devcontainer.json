@@ -53,7 +53,9 @@
 
   // Mount audio files directory
   "mounts": [
-    "source=${localWorkspaceFolder}/tests,target=/workspace/tests,type=bind,consistency=cached"
+    "source=${localWorkspaceFolder}/tests,target=/workspace/tests,type=bind,consistency=cached",
+    // Mount Windows Music Library for analysis
+    "source=C:\\Music\\Library,target=/music,type=bind,consistency=cached"
   ],
 
   // Forward ports for any web interfaces you might add later
