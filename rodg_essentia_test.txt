@@ -1,0 +1,44 @@
+[   INFO   ] MusicExtractorSVM: no classifier models were configured by default
+INFO: Analyzing: /workspace/tests/Rodg - 9th Ave (Extended Mix).flac
+
+================================================================================
+                                EDM CUE ANALYZER                                
+================================================================================
+
+Track: /workspace/tests/Rodg - 9th Ave (Extended Mix).flac
+BPM: 128.0
+Duration: 5:22
+Bar Duration: 1.88s
+
+Detected Structure:
+  Drops: 0:08, 1:00, 1:53, 3:16, 4:20, 5:15
+  Breakdowns: 2:15
+  Builds: None detected
+
+Generated Cue Points:
+
+Hot Cues:
+ID   Label                Time       Loop       Color     
+-----------------------------------------------------------------
+A    Early Intro          0:25       15.0s      ● BLUE
+B    Late Intro           1:04       30.0s      ● GREEN
+C    Pre-Drop             0:04       7.5s       ● ORANGE
+D    Post-Drop            0:15       15.0s      ● GREEN
+E    Breakdown            2:15       30.0s      ● TEAL
+F    Second Energy        1:00       15.0s      ● YELLOW
+G    Outro Start          4:34       15.0s      ● GREEN
+H    Safe Hold            2:41       30.0s      ● BLUE
+
+Memory Cues:
+Label                          Time      
+----------------------------------------
+Track Start                    0:00      
+First Drop                     0:08      
+Second Drop                    1:00      
+First Breakdown                2:15      
+Outro                          4:34      
+
+Track Timeline:
+| C D  A       F B                E      H                           G           |
+0:00                                                                        5:22
+

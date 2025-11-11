@@ -203,10 +203,24 @@ class EssentiaOnsetFeatureExtractor(FeatureExtractor):
         
         onset_strength = np.array(onset_values)
         
-        # Detect onset peaks
-        onsets_algo = es.Onsets()
-        onset_times = onsets_algo(onset_strength, [1] * len(onset_strength))
-        onset_times = onset_times * hopsize / sr  # Convert to seconds
+        # Detect onset peaks using simple peak detection
+        # Essentia's Onsets() expects different format, so we'll use a simpler approach
+        threshold = np.mean(onset_strength) + np.std(onset_strength)
+        onset_indices = []
+        
+        # Find peaks above threshold with minimum spacing
+        min_spacing = int(0.07 * sr / hopsize)  # 70ms minimum between onsets
+        last_onset = -min_spacing
+        
+        for i in range(1, len(onset_strength) - 1):
+            if (onset_strength[i] > threshold and
+                onset_strength[i] > onset_strength[i-1] and
+                onset_strength[i] > onset_strength[i+1] and
+                (i - last_onset) > min_spacing):
+                onset_indices.append(i)
+                last_onset = i
+        
+        onset_times = np.array(onset_indices) * hopsize / sr  # Convert to seconds
         
         logger.debug(f"Essentia detected {len(onset_times)} onsets")
         
