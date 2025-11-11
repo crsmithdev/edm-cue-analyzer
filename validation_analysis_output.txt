@@ -1,0 +1,136 @@
+EDM Cue Analyzer - Validation Analysis Output
+==============================================
+Date: 2025-11-11
+
+Track 1: Cristoph - Come With Me.flac
+--------------------------------------
+================================================================================
+Track: Cristoph - Come With Me.flac
+BPM: 123.0 | Duration: 3:11
+Drops (2): 0:15, 1:22
+Breakdowns: None detected
+Builds: None detected
+Cues: 8 hot, 5 memory
+Analysis time: ~21.00s
+================================================================================
+
+Manual labels:
+- Drops: 15s, 1m33s (93s), 2m36s (156s)
+- Breakdowns: 31s
+- Builds: None (unclear)
+
+
+Track 2: Rodg - The Coaster.flac
+---------------------------------
+================================================================================
+Track: Rodg - The Coaster.flac
+BPM: 128.0 | Duration: 3:06
+Drops (2): 0:05, 1:04
+Breakdowns: None detected
+Builds: None detected
+Cues: 8 hot, 5 memory
+Analysis time: 18.59s
+================================================================================
+
+Manual labels:
+- Drops: 17s, 2m17s (137s)
+- Breakdowns: 1m17s (77s)
+- Builds: 1m22s (82s)
+
+
+Track 3: Digital Mess - Orange Vortex.flac
+-------------------------------------------
+================================================================================
+Track: Digital Mess - Orange Vortex.flac
+BPM: 120.0 | Duration: 7:30
+Drops (5): 0:35, 3:05, 4:11, 5:19, 7:19
+Breakdowns: None detected
+Builds: None detected
+Cues: 8 hot, 5 memory
+Analysis time: 41.82s
+================================================================================
+
+Manual labels:
+- Drops: 32s, 5m3s (303s)
+- Breakdowns: 4m16s (256s)
+- Builds: None
+
+
+Track 4: Audiowerks - Acid Lingue (Original Mix).flac
+------------------------------------------------------
+================================================================================
+Track: Audiowerks - Acid Lingue (Original Mix).flac
+BPM: 137.0 | Duration: 6:08
+Drops (6): 0:27, 1:16, 2:16, 3:06, 3:55, 4:58
+Breakdowns: None detected
+Builds: None detected
+Cues: 8 hot, 5 memory
+Analysis time: 33.29s
+================================================================================
+
+Manual labels:
+- Drops: 27s, 1m51s (111s), 3m56s (236s)
+- Breakdowns: 1m23s (83s), 3m42s (222s)
+- Builds: None
+
+
+Track 5: AUTOFLOWER - THE ONLY ONE.flac
+----------------------------------------
+================================================================================
+Track: AUTOFLOWER - THE ONLY ONE.flac
+BPM: 124.0 | Duration: 3:37
+Drops (2): 0:05, 2:34
+Breakdowns: None detected
+Builds: None detected
+Cues: 8 hot, 5 memory
+Analysis time: 24.24s
+================================================================================
+
+Manual labels:
+- Drops: 1s, 2m3s (123s)
+- Breakdowns: 55s
+- Builds: ~1m18s (78s)
+
+
+===============================================================================
+VALIDATION SUMMARY
+===============================================================================
+
+Overall Statistics (5 tracks):
+- BPM Detection: 5/5 (100% accurate)
+- Average analysis time: 27.8s per track
+
+Drop Detection:
+- Total manual drops: 12
+- True positives: 6 (50%)
+- False negatives: 6 (50% missed)
+- False positives: 11 (many spurious detections)
+- Precision: 35.3% (6/(6+11))
+- Recall: 50% (6/12)
+
+Breakdown Detection:
+- Total manual breakdowns: 6
+- True positives: 0 (0%)
+- False negatives: 6 (100% missed)
+- Algorithm appears ineffective for breakdown detection
+
+Build Detection:
+- Total manual builds: 2
+- True positives: 0 (0%)
+- False negatives: 2 (100% missed)
+- Algorithm appears ineffective for build detection
+
+Key Issues Identified:
+1. High false positive rate for drops (detecting non-existent drops)
+2. Complete failure to detect breakdowns (0/6)
+3. Complete failure to detect builds (0/2)
+4. Drop timing sometimes off by 10-30 seconds
+5. Breakdown detection algorithm needs complete rework
+6. Build detection algorithm needs complete rework
+
+Recommendations:
+1. Tune drop detection thresholds to reduce false positives
+2. Implement or fix breakdown detection using spectral complexity
+3. Implement or fix build detection using energy gradient analysis
+4. Consider adjusting timing windows and minimum spacing parameters
+5. Test with more diverse track styles to understand edge cases

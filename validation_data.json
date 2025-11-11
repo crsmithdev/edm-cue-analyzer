@@ -27,9 +27,9 @@
             "evaluation": {
                 "drops": {
                     "true_positives": 1,
-                    "false_positives": 0,
+                    "false_positives": 1,
                     "false_negatives": 2,
-                    "notes": "Detected first drop at 15.75s (manual: 15s) ✓. Missed drop at 93s. Missed drop at 156s. Detected spurious drop at 82.75s."
+                    "notes": "Detected first drop at 15.75s (manual: 15s) ✓. Missed drop at 93s. Missed drop at 156s. False positive at 82.75s (no drop there)."
                 },
                 "breakdowns": {
                     "true_positives": 0,
@@ -39,6 +39,154 @@
                 },
                 "builds": {
                     "notes": "No builds detected, manual labels also unclear on build timing."
+                }
+            }
+        },
+        {
+            "filename": "Rodg - The Coaster.flac",
+            "duration_seconds": 186,
+            "bpm": 128.0,
+            "manual_labels": {
+                "drops": [
+                    17,
+                    137
+                ],
+                "breakdowns": [
+                    77
+                ],
+                "builds": [
+                    82
+                ],
+                "notes": "Build start at 1m22s (82s) is subjective"
+            },
+            "detected": {
+                "drops": [
+                    5,
+                    64
+                ],
+                "breakdowns": [],
+                "builds": []
+            },
+            "evaluation": {
+                "drops": {
+                    "true_positives": 0,
+                    "false_positives": 2,
+                    "false_negatives": 2,
+                    "notes": "Detected at 5s and 64s (1m04s). Manual drops at 17s and 2m17s (137s). No matches - completely missed both actual drops."
+                },
+                "breakdowns": {
+                    "true_positives": 0,
+                    "false_positives": 0,
+                    "false_negatives": 1,
+                    "notes": "Missed breakdown at 1m17s (77s)."
+                },
+                "builds": {
+                    "true_positives": 0,
+                    "false_positives": 0,
+                    "false_negatives": 1,
+                    "notes": "Missed build at 1m22s (82s)."
+                }
+            }
+        },
+        {
+            "filename": "Digital Mess - Orange Vortex.flac",
+            "duration_seconds": 450,
+            "bpm": 120.0,
+            "manual_labels": {
+                "drops": [32, 303],
+                "breakdowns": [256],
+                "builds": [],
+                "notes": "Manual: drops at 32s and 5m3s (303s), breakdown at 4m16s (256s), no builds"
+            },
+            "detected": {
+                "drops": [35, 185, 251, 319, 439],
+                "breakdowns": [],
+                "builds": []
+            },
+            "evaluation": {
+                "drops": {
+                    "true_positives": 2,
+                    "false_positives": 3,
+                    "false_negatives": 0,
+                    "notes": "Detected at 35s (manual: 32s) ✓. Detected at 5m19s/319s (manual: 5m03s/303s) - close match ✓. False positives at 3m05s (185s), 4m11s (251s), 7m19s (439s)."
+                },
+                "breakdowns": {
+                    "true_positives": 0,
+                    "false_positives": 0,
+                    "false_negatives": 1,
+                    "notes": "Missed breakdown at 4m16s (256s)."
+                },
+                "builds": {
+                    "notes": "No builds detected or labeled."
+                }
+            }
+        },
+        {
+            "filename": "Audiowerks - Acid Lingue (Original Mix).flac",
+            "duration_seconds": 368,
+            "bpm": 137.0,
+            "manual_labels": {
+                "drops": [27, 111, 236],
+                "breakdowns": [83, 222],
+                "builds": [],
+                "notes": "Manual: drops at 27s, 1m51s (111s), 3m56s (236s); breakdowns at 1m23s (83s), 3m42s (222s)"
+            },
+            "detected": {
+                "drops": [27, 76, 136, 186, 235, 298],
+                "breakdowns": [],
+                "builds": []
+            },
+            "evaluation": {
+                "drops": {
+                    "true_positives": 2,
+                    "false_positives": 4,
+                    "false_negatives": 1,
+                    "notes": "Detected at 27s (manual: 27s) ✓. Detected at 3m55s/235s (manual: 3m56s/236s) ✓. Missed drop at 1m51s (111s). False positives at 1m16s (76s), 2m16s (136s), 3m06s (186s), 4m58s (298s)."
+                },
+                "breakdowns": {
+                    "true_positives": 0,
+                    "false_positives": 0,
+                    "false_negatives": 2,
+                    "notes": "Missed breakdown at 1m23s (83s). Missed breakdown at 3m42s (222s)."
+                },
+                "builds": {
+                    "notes": "No builds detected or labeled."
+                }
+            }
+        },
+        {
+            "filename": "AUTOFLOWER - THE ONLY ONE.flac",
+            "duration_seconds": 217,
+            "bpm": 124.0,
+            "manual_labels": {
+                "drops": [1, 123],
+                "breakdowns": [55],
+                "builds": [78],
+                "notes": "Manual: drops at 1s, 2m3s (123s); breakdown at 55s; build at approximately 1m18s (78s)"
+            },
+            "detected": {
+                "drops": [5, 154],
+                "breakdowns": [],
+                "builds": []
+            },
+            "evaluation": {
+                "drops": {
+                    "true_positives": 1,
+                    "false_positives": 1,
+                    "false_negatives": 1,
+                    "notes": "Detected at 5s (manual: 1s) - close match ✓. Detected at 2m34s/154s (manual: 2m3s/123s) - 31s off, likely wrong. Possibly missed actual second drop."
+                },
+                "breakdowns": {
+                    "true_positives": 0,
+                    "false_positives": 0,
+                    "false_negatives": 1,
+                    "notes": "Missed breakdown at 55s."
+                },
+                "builds": {
+                    "true_positives": 0,
+                    "false_positives": 0,
+                    "false_negatives": 1,
+                    "notes": "Missed build at approximately 1m18s (78s)."
                 }
             }
         }
