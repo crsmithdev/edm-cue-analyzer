@@ -8,6 +8,7 @@ from pathlib import Path
 
 import librosa
 import numpy as np
+from scipy import interpolate
 
 from .config import AnalysisConfig
 
@@ -145,7 +146,7 @@ class SpectralFeatureExtractor(FeatureExtractor):
 
 
 class OnsetFeatureExtractor(FeatureExtractor):
-    """Onset detection feature extractor for precise event timing."""
+    """Onset detection feature extractor for precise event timing (librosa-based)."""
 
     @property
     def name(self) -> str:
@@ -170,6 +171,117 @@ class OnsetFeatureExtractor(FeatureExtractor):
         }
 
 
+class EssentiaOnsetFeatureExtractor(FeatureExtractor):
+    """Essentia-based onset detection (superior for EDM transients)."""
+
+    @property
+    def name(self) -> str:
+        return "onset"
+
+    def extract(self, y: np.ndarray, sr: int, **kwargs) -> dict[str, np.ndarray]:
+        """Extract onset features using Essentia's onset detection."""
+        if not ESSENTIA_AVAILABLE:
+            logger.warning("Essentia not available, falling back to librosa onset detection")
+            return OnsetFeatureExtractor().extract(y, sr, **kwargs)
+
+        framesize = 2048
+        hopsize = 512
+
+        # Setup Essentia algorithms
+        w = es.Windowing(type='hann')
+        fft = es.FFT()
+        c2p = es.CartesianToPolar()
+        
+        # Use 'complex' method - best for percussive EDM drops
+        onset_detection = es.OnsetDetection(method='complex')
+        
+        # Process frames
+        onset_values = []
+        for frame in es.FrameGenerator(y, frameSize=framesize, hopSize=hopsize):
+            mag, phase = c2p(fft(w(frame)))
+            onset_values.append(onset_detection(mag, phase))
+        
+        onset_strength = np.array(onset_values)
+        
+        # Detect onset peaks
+        onsets_algo = es.Onsets()
+        onset_times = onsets_algo(onset_strength, [1] * len(onset_strength))
+        onset_times = onset_times * hopsize / sr  # Convert to seconds
+        
+        logger.debug(f"Essentia detected {len(onset_times)} onsets")
+        
+        return {
+            "onset_strength": onset_strength,
+            "onset_times": onset_times,
+        }
+
+
+class EssentiaSpectralFeatureExtractor(FeatureExtractor):
+    """Essentia-based spectral features (better for texture analysis)."""
+
+    @property
+    def name(self) -> str:
+        return "spectral"
+
+    def extract(self, y: np.ndarray, sr: int, **kwargs) -> dict[str, np.ndarray]:
+        """Extract spectral features using Essentia."""
+        if not ESSENTIA_AVAILABLE:
+            logger.warning("Essentia not available, falling back to librosa spectral features")
+            return SpectralFeatureExtractor().extract(y, sr, **kwargs)
+
+        framesize = 2048
+        hopsize = 512
+
+        # Setup Essentia algorithms
+        w = es.Windowing(type='hann')
+        spectrum = es.Spectrum()
+        
+        # Key algorithms for EDM analysis
+        complexity_algo = es.SpectralComplexity()
+        contrast_algo = es.SpectralContrast()
+        centroid_algo = es.Centroid()
+        hfc_algo = es.HFC()  # High Frequency Content
+        
+        # Process frames
+        complexities = []
+        contrasts = []
+        centroids = []
+        hfcs = []
+        
+        for frame in es.FrameGenerator(y, frameSize=framesize, hopSize=hopsize):
+            spec = spectrum(w(frame))
+            complexities.append(complexity_algo(spec))
+            contrasts.append(contrast_algo(spec))
+            centroids.append(centroid_algo(spec))
+            hfcs.append(hfc_algo(spec))
+        
+        features = {
+            "spectral_complexity": np.array(complexities),
+            "spectral_contrast": np.array(contrasts),
+            "spectral_centroid": np.array(centroids),
+            "hfc": np.array(hfcs),  # High frequency content
+        }
+        
+        # Also calculate frequency band energy for compatibility
+        stft = np.abs(librosa.stft(y))
+        freqs = librosa.fft_frequencies(sr=sr)
+
+        low_freq_max = kwargs.get("low_freq_max", 250)
+        mid_freq_max = kwargs.get("mid_freq_max", 4000)
+
+        low_mask = freqs < low_freq_max
+        mid_mask = (freqs >= low_freq_max) & (freqs < mid_freq_max)
+        high_mask = freqs >= mid_freq_max
+
+        features["low_energy"] = np.mean(stft[low_mask, :], axis=0)
+        features["mid_energy"] = np.mean(stft[mid_mask, :], axis=0)
+        features["high_energy"] = np.mean(stft[high_mask, :], axis=0)
+        
+        logger.debug("Essentia extracted spectral features: complexity, contrast, centroid, HFC")
+        
+        return features
+
+
 class AudioAnalyzer:
     """Analyzes audio files to extract structure and characteristics."""
 
@@ -185,13 +297,18 @@ class AudioAnalyzer:
         """
         self.config = config
 
-        # Default feature extractors
+        # Default feature extractors - use Essentia when available for better EDM analysis
         if feature_extractors is None:
             self.feature_extractors = [
-                HPSSFeatureExtractor(),
-                SpectralFeatureExtractor(),
-                OnsetFeatureExtractor(),
+                HPSSFeatureExtractor(),  # No Essentia equivalent, keep librosa
+                # Use Essentia extractors if available, fall back to librosa
+                EssentiaSpectralFeatureExtractor() if ESSENTIA_AVAILABLE else SpectralFeatureExtractor(),
+                EssentiaOnsetFeatureExtractor() if ESSENTIA_AVAILABLE else OnsetFeatureExtractor(),
             ]
+            if ESSENTIA_AVAILABLE:
+                logger.debug("Using Essentia-based feature extractors for improved accuracy")
+            else:
+                logger.debug("Using librosa-based feature extractors (Essentia not available)")
         else:
             self.feature_extractors = feature_extractors
 
@@ -453,6 +570,8 @@ class AudioAnalyzer:
     ) -> list[float]:
         """
         Detect breakdown points using combined energy and available features.
+        
+        Uses spectral complexity and HFC from Essentia if available for better accuracy.
 
         Args:
             energy: Overall energy curve
@@ -468,11 +587,46 @@ class AudioAnalyzer:
         max_energy = np.max(energy)
         mean_energy = np.mean(energy)
 
-        # Use HPSS features if available
+        # Check for Essentia spectral features (best for breakdown detection)
+        use_spectral = "spectral_complexity" in features and "hfc" in features
         use_hpss = "harmonic_energy" in features and "percussive_energy" in features
-        logger.debug("Breakdown detection mode: %s", "HPSS-based" if use_hpss else "energy-based")
+        
+        if use_spectral:
+            logger.debug("Breakdown detection mode: Essentia spectral-based")
+        elif use_hpss:
+            logger.debug("Breakdown detection mode: HPSS-based")
+        else:
+            logger.debug("Breakdown detection mode: energy-based")
 
-        if use_hpss:
+        # Setup thresholds based on available features
+        if use_spectral:
+            spectral_complexity = features["spectral_complexity"]
+            hfc = features["hfc"]
+            
+            # Align spectral features with energy curve
+            # Spectral features may have different frame count, interpolate if needed
+            if len(spectral_complexity) != len(energy):
+                from scipy import interpolate
+                old_indices = np.linspace(0, len(times)-1, len(spectral_complexity))
+                new_indices = np.arange(len(times))
+                f_complexity = interpolate.interp1d(old_indices, spectral_complexity, 
+                                                    kind='linear', fill_value='extrapolate')
+                f_hfc = interpolate.interp1d(old_indices, hfc, 
+                                            kind='linear', fill_value='extrapolate')
+                spectral_complexity = f_complexity(new_indices)
+                hfc = f_hfc(new_indices)
+            
+            mean_complexity = np.mean(spectral_complexity)
+            mean_hfc = np.mean(hfc)
+            
+            # Breakdowns have low complexity and low HFC
+            complexity_threshold = mean_complexity * 0.7
+            hfc_threshold = mean_hfc * 0.6
+            energy_threshold = min(
+                max_energy * self.config.breakdown_energy_threshold, mean_energy * 0.85
+            )
+            
+        elif use_hpss:
             harmonic_energy = features["harmonic_energy"]
             percussive_energy = features["percussive_energy"]
             mean_perc = np.mean(percussive_energy)
@@ -500,7 +654,14 @@ class AudioAnalyzer:
 
         for i in range(len(energy)):
             # Determine if this is breakdown-like based on available features
-            if use_hpss:
+            if use_spectral:
+                # Essentia-based: low energy + low complexity + low HFC = breakdown
+                is_breakdown_like = (
+                    energy[i] < energy_threshold and
+                    spectral_complexity[i] < complexity_threshold and
+                    hfc[i] < hfc_threshold
+                )
+            elif use_hpss:
                 is_breakdown_like = energy[i] < energy_threshold and (
                     percussive_energy[i] < perc_threshold or harmonic_ratio[i] > ratio_threshold
                 )
@@ -519,7 +680,14 @@ class AudioAnalyzer:
                     breakdown_avg = np.mean(energy[breakdown_start_idx:i])
 
                     valid_breakdown = breakdown_avg < mean_energy * 0.9
-                    if use_hpss:
+                    
+                    if use_spectral:
+                        # Essentia validation: breakdown region should have low complexity
+                        breakdown_complexity_avg = np.mean(spectral_complexity[breakdown_start_idx:i])
+                        valid_breakdown = valid_breakdown and (
+                            breakdown_complexity_avg < mean_complexity * 0.8
+                        )
+                    elif use_hpss:
                         breakdown_perc_avg = np.mean(percussive_energy[breakdown_start_idx:i])
                         valid_breakdown = valid_breakdown and (breakdown_perc_avg < mean_perc * 0.8)
 
