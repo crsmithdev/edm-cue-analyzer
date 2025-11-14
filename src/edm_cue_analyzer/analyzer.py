@@ -347,7 +347,16 @@ class EssentiaSpectralFeatureExtractor(FeatureExtractor):
 
 
 class AudioAnalyzer:
-    """Analyzes audio files to extract structure and characteristics."""
+    """
+    Analyzes audio files to extract structure and characteristics.
+    
+    This is a single-file analysis library. It provides async primitives for
+    analyzing individual tracks. Batch processing and parallelization across
+    multiple files should be handled by the calling code (e.g., CLI, web API).
+    
+    Internal operations (like BPM consensus detection) may use parallelization
+    as an implementation detail, but this is transparent to the caller.
+    """
 
     def __init__(
         self, config: AnalysisConfig, feature_extractors: list[FeatureExtractor] | None = None

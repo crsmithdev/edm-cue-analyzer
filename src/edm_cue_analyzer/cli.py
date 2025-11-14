@@ -90,6 +90,10 @@ async def analyze_track(
 ) -> tuple[int, float]:
     """
     Analyze a single track and generate cues.
+    
+    This is the primary single-file analysis function. It wraps the library's
+    analyzer with CLI-specific concerns (progress display, error handling, output).
+    For batch processing, see batch_analyze() which orchestrates multiple calls.
 
     Args:
         filepath: Path to audio file
@@ -100,8 +104,8 @@ async def analyze_track(
         analyses: Analyses to run ('bpm-only', 'structure', 'full') or set of names
         log_file: Optional path to append log output to
         verbose: Enable verbose output
-        track_num: Current track number (for progress display)
-        total_tracks: Total number of tracks (for progress display)
+        track_num: Current track number (for progress display in batch mode)
+        total_tracks: Total number of tracks (for progress display in batch mode)
 
     Returns:
         Tuple of (exit_code, elapsed_time)
@@ -194,25 +198,22 @@ async def batch_analyze(
     max_concurrent: int = 4,
 ) -> int:
     """
-    Analyze multiple tracks.
+    Analyze multiple tracks with optional parallel processing.
+    
+    This is a CLI orchestration function that controls how multiple files
+    are processed. The library provides single-file analysis primitives,
+    and this function coordinates batch processing with concurrency control.
 
     Args:
         files: List of audio files to analyze
         config: Configuration object
-        output_xml: Optional path for XML output
+        output_xml: Optional path for XML output (only for single file)
         display: Whether to display results in terminal
-        bpm_only: Only detect BPM (deprecated)
+        bpm_only: Only detect BPM (deprecated, use analyses='bpm-only')
         analyses: List of analyses to run
         log_file: Optional log file path
         verbose: Enable verbose output
-        max_concurrent: Maximum number of files to process concurrently
-        output_xml: Optional path for XML output
-        display: Whether to display results in terminal
-        bpm_only: Only detect BPM (deprecated)
-        analyses: List of analyses to run
-        log_file: Optional log file path
-        verbose: Enable verbose output
-        max_concurrent: Maximum number of files to process concurrently
+        max_concurrent: Maximum number of files to process concurrently (default: 4)
 
     Returns:
         Exit code (0 for success, 1 if any errors)
