@@ -12,6 +12,7 @@ from .analyzer import AudioAnalyzer
 from .config import Config, get_default_config, load_config
 from .cue_generator import CueGenerator
 from .display import display_results
+from .essentia_config import enable_verbose_logging
 from .rekordbox import export_to_rekordbox
 
 logger = logging.getLogger(__name__)
@@ -81,6 +82,7 @@ async def analyze_track(
     output_xml: Path | None = None,
     display: bool = True,
     bpm_only: bool = False,
+    analyses: str | set[str] | None = None,
     log_file: Path | None = None,
     verbose: bool = False,
     track_num: int | None = None,
@@ -94,7 +96,8 @@ async def analyze_track(
         config: Configuration object
         output_xml: Optional path for XML output
         display: Whether to display results in terminal
-        bpm_only: Only detect and display BPM
+        bpm_only: Only detect and display BPM (deprecated, use analyses='bpm-only')
+        analyses: Analyses to run ('bpm-only', 'structure', 'full') or set of names
         log_file: Optional path to append log output to
         verbose: Enable verbose output
         track_num: Current track number (for progress display)
@@ -115,20 +118,34 @@ async def analyze_track(
         # Analyze audio
         analyzer = AudioAnalyzer(config.analysis)
 
+        # Determine which analyses to run
         if bpm_only:
-            # Just detect BPM (fast mode - skips feature extraction)
-            structure = await analyzer.detect_bpm_only(filepath)
-            elapsed = time.perf_counter() - start_time
+            # Backward compatibility: --bpm-only flag
+            requested_analyses = "bpm-only"
+        elif analyses:
+            # Use new analyses parameter
+            if len(analyses) == 1:
+                requested_analyses = analyses[0]  # Could be preset or single analysis
+            else:
+                requested_analyses = set(analyses)  # Multiple analyses
+        else:
+            # Default: full analysis
+            requested_analyses = "full"
 
+        # Run analyses
+        structure = await analyzer.analyze_with(filepath, analyses=requested_analyses)
+
+        # Check if we're doing minimal output (bpm-only)
+        if requested_analyses == "bpm-only" or (
+            isinstance(requested_analyses, str) and requested_analyses == "bpm"
+        ):
+            elapsed = time.perf_counter() - start_time
             # Output to stdout
             print(f"\nBPM: {structure.bpm:.1f} | Duration: {_format_time(structure.duration)}")
             print(f"Analysis time: {elapsed:.2f}s\n")
-
             return 0, elapsed
 
-        structure = await analyzer.analyze_file(filepath)
-
-        # Generate cues
+        # Generate cues (for full or structure analysis)
         generator = CueGenerator(config)
         cues = generator.generate_cues(structure)
 
@@ -171,8 +188,10 @@ async def batch_analyze(
     output_xml: Path | None = None,
     display: bool = True,
     bpm_only: bool = False,
+    analyses: list[str] | None = None,
     log_file: Path | None = None,
     verbose: bool = False,
+    max_concurrent: int = 4,
 ) -> int:
     """
     Analyze multiple tracks.
@@ -182,9 +201,18 @@ async def batch_analyze(
         config: Configuration object
         output_xml: Optional path for XML output
         display: Whether to display results in terminal
-        bpm_only: Only detect and display BPM
-        log_file: Optional path to append log output to
+        bpm_only: Only detect BPM (deprecated)
+        analyses: List of analyses to run
+        log_file: Optional log file path
         verbose: Enable verbose output
+        max_concurrent: Maximum number of files to process concurrently
+        output_xml: Optional path for XML output
+        display: Whether to display results in terminal
+        bpm_only: Only detect BPM (deprecated)
+        analyses: List of analyses to run
+        log_file: Optional log file path
+        verbose: Enable verbose output
+        max_concurrent: Maximum number of files to process concurrently
 
     Returns:
         Exit code (0 for success, 1 if any errors)
@@ -198,22 +226,61 @@ async def batch_analyze(
     results = []
     errors = 0
 
-    for i, filepath in enumerate(files, 1):
-        exit_code, elapsed = await analyze_track(
-            filepath,
-            config,
-            output_xml=output_xml if total_files == 1 else None,  # Only single file XML
-            display=display,
-            bpm_only=bpm_only,
-            log_file=log_file,
-            verbose=verbose,
-            track_num=i,
-            total_tracks=total_files,
-        )
+    # Process files in parallel
+    concurrent_jobs = min(max_concurrent, total_files)
+    
+    if concurrent_jobs > 1 and total_files > 1:
+        logger.info(f"Processing up to {concurrent_jobs} files concurrently")
+        
+        async def analyze_with_index(i: int, filepath: Path):
+            """Analyze a single file with its index."""
+            exit_code, elapsed = await analyze_track(
+                filepath,
+                config,
+                output_xml=output_xml if total_files == 1 else None,
+                display=display,
+                bpm_only=bpm_only,
+                analyses=analyses,
+                log_file=log_file,
+                verbose=verbose,
+                track_num=i + 1,
+                total_tracks=total_files,
+            )
+            return (filepath, exit_code, elapsed)
+        
+        # Process in batches of concurrent_jobs
+        for batch_start_idx in range(0, total_files, concurrent_jobs):
+            batch_end_idx = min(batch_start_idx + concurrent_jobs, total_files)
+            batch_files = files[batch_start_idx:batch_end_idx]
+            
+            # Run this batch concurrently
+            batch_results = await asyncio.gather(
+                *[analyze_with_index(batch_start_idx + j, f) for j, f in enumerate(batch_files)]
+            )
+            
+            for filepath, exit_code, elapsed in batch_results:
+                results.append((filepath, exit_code, elapsed))
+                if exit_code != 0:
+                    errors += 1
+    else:
+        # Sequential processing for single file or when max_concurrent is 1
+        for i, filepath in enumerate(files, 1):
+            exit_code, elapsed = await analyze_track(
+                filepath,
+                config,
+                output_xml=output_xml if total_files == 1 else None,
+                display=display,
+                bpm_only=bpm_only,
+                analyses=analyses,
+                log_file=log_file,
+                verbose=verbose,
+                track_num=i,
+                total_tracks=total_files,
+            )
 
-        results.append((filepath, exit_code, elapsed))
-        if exit_code != 0:
-            errors += 1
+            results.append((filepath, exit_code, elapsed))
+            if exit_code != 0:
+                errors += 1
 
     batch_elapsed = time.perf_counter() - batch_start
 
@@ -287,6 +354,22 @@ Examples:
         "--bpm-only", action="store_true", help="Only detect and display BPM (skip full analysis)"
     )
 
+    parser.add_argument(
+        "-a",
+        "--analyses",
+        type=str,
+        nargs="+",
+        help="Analyses to run: bpm, energy, drops, breakdowns, builds, or presets: bpm-only, structure, full (default: full)",
+    )
+
+    parser.add_argument(
+        "-j",
+        "--jobs",
+        type=int,
+        default=4,
+        help="Number of files to process concurrently (default: 4, use 1 for sequential)",
+    )
+
     parser.add_argument("--verbose", action="store_true", help="Enable verbose debug logging")
 
     parser.add_argument(
@@ -319,6 +402,10 @@ Examples:
 
     # Set log level for edm_cue_analyzer package
     logging.getLogger("edm_cue_analyzer").setLevel(log_level)
+
+    # Re-enable Essentia INFO logging if verbose mode
+    if args.verbose:
+        enable_verbose_logging()
 
     # Suppress overly verbose libraries
     logging.getLogger("numba").setLevel(logging.WARNING)
@@ -368,8 +455,10 @@ Examples:
             output_xml=args.output,
             display=not args.no_display,
             bpm_only=args.bpm_only,
+            analyses=args.analyses,
             log_file=args.log_file,
             verbose=args.verbose,
+            max_concurrent=args.jobs,
         )
     )
 

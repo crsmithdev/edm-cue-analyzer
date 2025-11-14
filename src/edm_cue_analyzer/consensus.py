@@ -1,6 +1,8 @@
 """Consensus-based analysis algorithms for improved accuracy."""
 
+import asyncio
 import logging
+from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor
 from dataclasses import dataclass
 from typing import Any
 
@@ -8,13 +10,8 @@ import numpy as np
 
 logger = logging.getLogger(__name__)
 
-# Try to import essentia
-try:
-    import essentia.standard as es
-
-    ESSENTIA_AVAILABLE = True
-except ImportError:
-    ESSENTIA_AVAILABLE = False
+# Import Essentia with proper logging configuration
+from .essentia_config import es, ESSENTIA_AVAILABLE
 
 # Try to import aubio
 try:
@@ -70,9 +67,9 @@ class ConsensusBpmDetector:
         self.expected_range = expected_range
         self.octave_tolerance = octave_tolerance
 
-    def detect(self, y: np.ndarray, sr: int) -> BpmEstimate:
+    async def detect_async(self, y: np.ndarray, sr: int) -> BpmEstimate:
         """
-        Detect BPM using consensus of multiple methods.
+        Detect BPM using consensus of multiple methods (async, parallelized).
 
         Args:
             y: Audio time series (mono, float32)
@@ -81,64 +78,90 @@ class ConsensusBpmDetector:
         Returns:
             BpmEstimate with consensus BPM and confidence
         """
-        estimates = []
-
-        # Method 1: Essentia RhythmDescriptors (most comprehensive)
-        # This may return multiple estimates if second peak is significant
+        # Define all detection tasks
+        tasks = []
+        
         if ESSENTIA_AVAILABLE:
-            try:
-                rhythm_estimates = self._detect_essentia_rhythm_descriptors(y, sr)
-                estimates.extend(rhythm_estimates)
-            except Exception as e:
-                logger.debug("Essentia RhythmDescriptors failed: %s", e)
-
-            # Method 2: Essentia RhythmExtractor2013 multifeature
-            try:
-                estimates.append(self._detect_essentia_multifeature(y, sr))
-            except Exception as e:
-                logger.debug("Essentia multifeature failed: %s", e)
-
-            # Method 3: Essentia RhythmExtractor2013 degara (fast)
-            try:
-                estimates.append(self._detect_essentia_degara(y, sr))
-            except Exception as e:
-                logger.debug("Essentia degara failed: %s", e)
-
-            # Method 4: Essentia PercivalBpmEstimator
-            try:
-                estimates.append(self._detect_essentia_percival(y, sr))
-            except Exception as e:
-                logger.debug("Essentia Percival failed: %s", e)
-
-        # Method 5: Aubio
+            tasks.extend([
+                ("essentia_rhythm", self._detect_essentia_rhythm_descriptors),
+                ("essentia_multifeature", self._detect_essentia_multifeature),
+                ("essentia_degara", self._detect_essentia_degara),
+                ("essentia_percival", self._detect_essentia_percival),
+            ])
+        
         if AUBIO_AVAILABLE:
+            tasks.append(("aubio", self._detect_aubio))
+        
+        tasks.append(("librosa", self._detect_librosa))
+        
+        # Run all methods in parallel
+        logger.debug(f"Running {len(tasks)} BPM detection methods in parallel...")
+        
+        import time
+        
+        async def run_method(name: str, method):
+            """Run a single detection method in a thread."""
+            start = time.perf_counter()
             try:
-                estimates.append(self._detect_aubio(y, sr))
+                result = await asyncio.to_thread(method, y, sr)
+                elapsed = time.perf_counter() - start
+                logger.debug(f"{name} completed in {elapsed:.2f}s")
+                # Handle methods that return lists
+                if isinstance(result, list):
+                    return result
+                return [result]
             except Exception as e:
-                logger.debug("Aubio detection failed: %s", e)
-
-        # Method 6: Librosa (fallback)
-        try:
-            import librosa
-
-            estimates.append(self._detect_librosa(y, sr))
-        except Exception as e:
-            logger.debug("Librosa detection failed: %s", e)
-
+                elapsed = time.perf_counter() - start
+                logger.debug(f"{name} failed after {elapsed:.2f}s: {e}")
+                return []
+        
+        # Execute all methods concurrently
+        start_parallel = time.perf_counter()
+        results = await asyncio.gather(*[run_method(name, method) for name, method in tasks])
+        parallel_time = time.perf_counter() - start_parallel
+        logger.debug(f"Parallel execution completed in {parallel_time:.2f}s")
+        
+        # Flatten results (some methods return lists)
+        estimates = []
+        for result_list in results:
+            estimates.extend(result_list)
+        
         if not estimates:
             raise RuntimeError("All BPM detection methods failed")
-
-        # Build consensus
+        
+        logger.debug(f"Collected {len(estimates)} BPM estimates")
+        
+        # Build consensus from all available estimates
         consensus = self._build_consensus(estimates)
-
+        
         logger.info(
             "BPM Consensus: %.1f BPM (confidence: %.2f%%, %d methods agreed)",
             consensus.bpm,
             consensus.confidence * 100,
             len([e for e in estimates if abs(e.bpm - consensus.bpm) < 2]),
         )
-
+        
         return consensus
+
+    def detect(self, y: np.ndarray, sr: int) -> BpmEstimate:
+        """
+        Detect BPM using consensus of multiple methods (synchronous wrapper).
+
+        Args:
+            y: Audio time series (mono, float32)
+            sr: Sample rate
+
+        Returns:
+            BpmEstimate with consensus BPM and confidence
+        """
+        # Run async version in event loop
+        try:
+            loop = asyncio.get_running_loop()
+            # We're already in an async context, use the async version directly
+            raise RuntimeError("Use detect_async() when in async context")
+        except RuntimeError:
+            # No running loop, create one
+            return asyncio.run(self.detect_async(y, sr))
 
     def _detect_essentia_rhythm_descriptors(self, y: np.ndarray, sr: int) -> list[BpmEstimate]:
         """
