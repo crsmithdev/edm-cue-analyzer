@@ -399,6 +399,110 @@ class AudioAnalyzer:
             self.feature_extractors.remove(extractor)
             del self.extractors_by_name[name]
 
+    @timed("BPM detection")
+    async def detect_bpm_only(self, audio_path: Path) -> TrackStructure:
+        """
+        Detect only BPM and duration, skipping feature extraction and structural analysis.
+        
+        This is much faster than full analysis when you only need tempo information.
+
+        Args:
+            audio_path: Path to audio file
+
+        Returns:
+            TrackStructure with only BPM, duration, and beats populated
+
+        Raises:
+            FileNotFoundError: If audio file doesn't exist
+            ValueError: If audio file is invalid or too short
+        """
+        if not audio_path.exists():
+            raise FileNotFoundError(f"Audio file not found: {audio_path}")
+
+        logger.debug("Loading audio file: %s", audio_path)
+        load_start = time.perf_counter()
+
+        # Load with native sample rate (much faster than librosa.load)
+        y, sr = await asyncio.to_thread(sf.read, str(audio_path), dtype="float32")
+
+        # Convert to mono if stereo
+        if y.ndim > 1:
+            y = y.mean(axis=1)
+
+        duration = len(y) / sr
+        load_time = time.perf_counter() - load_start
+        logger.info(f"⏱️  Audio loading: {load_time:.2f}s (native {sr} Hz, no resampling)")
+
+        # Validate minimum duration
+        if duration < 10.0:
+            raise ValueError(f"Track too short for analysis: {duration:.1f}s (minimum 10s)")
+
+        # Detect tempo and beats using consensus model
+        consensus_detector = ConsensusBpmDetector(
+            min_bpm=60.0,
+            max_bpm=200.0,
+            expected_range=(120.0, 145.0),  # EDM typical range
+            octave_tolerance=0.1,
+        )
+
+        try:
+            # Ensure mono float32 for consensus detector
+            y_mono = y if y.ndim == 1 else np.mean(y, axis=1)
+            y_mono = y_mono.astype(np.float32)
+
+            bpm_estimate = consensus_detector.detect(y_mono, sr)
+            bpm = bpm_estimate.bpm
+            beats = bpm_estimate.beats
+
+            logger.info(
+                "BPM detected: %.1f (confidence: %.1f%%, consensus from %d methods)",
+                bpm,
+                bpm_estimate.confidence * 100,
+                bpm_estimate.metadata.get("num_methods", 1),
+            )
+
+            # Log if low confidence
+            if bpm_estimate.confidence < 0.6:
+                logger.warning(
+                    "Low BPM confidence (%.1f%%) - consider manual verification",
+                    bpm_estimate.confidence * 100,
+                )
+
+            # If consensus didn't provide beats, generate them
+            if beats is None:
+                logger.warning("Consensus didn't provide beat positions, generating from BPM")
+                _, beats = librosa.beat.beat_track(y=y_mono, sr=sr, start_bpm=bpm, tightness=100)
+
+        except Exception as e:
+            logger.error("Consensus BPM detection failed: %s", e)
+            # Ultimate fallback to single method
+            logger.warning("Falling back to single-method BPM detection")
+            if ESSENTIA_AVAILABLE:
+                try:
+                    bpm, beats = self._detect_bpm_essentia(audio_path, y, sr)
+                except Exception as e2:
+                    logger.warning("Essentia fallback failed: %s", e2)
+                    bpm, beats = self._detect_bpm_librosa(y, sr)
+            else:
+                bpm, beats = self._detect_bpm_librosa(y, sr)
+
+        beat_times = librosa.frames_to_time(beats, sr=sr)
+        bar_duration = (60.0 / bpm) * 4
+
+        # Return minimal structure with only BPM info
+        return TrackStructure(
+            bpm=bpm,
+            duration=duration,
+            beats=beat_times,
+            bar_duration=bar_duration,
+            energy_curve=np.array([]),
+            energy_times=np.array([]),
+            drops=[],
+            breakdowns=[],
+            builds=[],
+            features={},
+        )
+
     @timed("Total track analysis")
     async def analyze(self, audio_path: Path) -> TrackStructure:
         """
@@ -475,7 +579,6 @@ class AudioAnalyzer:
             # If consensus didn't provide beats, generate them
             if beats is None:
                 logger.warning("Consensus didn't provide beat positions, generating from BPM")
-                import librosa
                 _, beats = librosa.beat.beat_track(y=y_mono, sr=sr, start_bpm=bpm, tightness=100)
 
         except Exception as e:

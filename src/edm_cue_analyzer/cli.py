@@ -116,8 +116,8 @@ async def analyze_track(
         analyzer = AudioAnalyzer(config.analysis)
 
         if bpm_only:
-            # Just detect BPM
-            structure = await analyzer.analyze_file(filepath)
+            # Just detect BPM (fast mode - skips feature extraction)
+            structure = await analyzer.detect_bpm_only(filepath)
             elapsed = time.perf_counter() - start_time
 
             # Output to stdout
