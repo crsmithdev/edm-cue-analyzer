@@ -1,0 +1,12 @@
+================================================================================
+Quick Consensus BPM Test: Adam Beyer - Pilot
+================================================================================
+Audio file: Adam Beyer - Pilot.flac
+Official BPM: 133 BPM (Beatport)
+Previous single-method: 122.2 BPM (octave error)
+
+Loading audio...
+Duration: 235.8 seconds
+Sample rate: 48000 Hz
+
+Running consensus BPM detection...

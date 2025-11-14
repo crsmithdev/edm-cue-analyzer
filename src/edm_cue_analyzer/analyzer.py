@@ -13,6 +13,7 @@ import numpy as np
 import soundfile as sf
 
 from .config import AnalysisConfig
+from .consensus import ConsensusBpmDetector
 
 logger = logging.getLogger(__name__)
 
@@ -364,14 +365,14 @@ class AudioAnalyzer:
         if feature_extractors is None:
             self.feature_extractors = []
 
+            # Add HPSS for accurate drop/breakdown detection (percussive energy tracking)
+            self.feature_extractors.append(HPSSFeatureExtractor())
+
             # Add spectral feature extractor (Essentia preferred, librosa fallback)
             if ESSENTIA_AVAILABLE:
                 self.feature_extractors.append(EssentiaSpectralFeatureExtractor())
-                # Skip HPSS when using Essentia spectral features (better & faster)
-                logger.debug("Using Essentia-based feature extractors (skipping HPSS)")
+                logger.debug("Using Essentia spectral features + HPSS for drop detection")
             else:
-                # Use HPSS + librosa spectral when Essentia not available
-                self.feature_extractors.append(HPSSFeatureExtractor())
                 self.feature_extractors.append(SpectralFeatureExtractor())
                 logger.debug("Using librosa-based feature extractors with HPSS")
 
@@ -437,29 +438,58 @@ class AudioAnalyzer:
         if duration < 10.0:
             raise ValueError(f"Track too short for analysis: {duration:.1f}s (minimum 10s)")
 
-        # Detect tempo and beats
-        logger.debug("Detecting tempo and beats...")
+        # Detect tempo and beats using consensus model
+        logger.debug("Detecting tempo and beats (consensus model)...")
 
-        # Try essentia first (best for EDM), then aubio, then librosa
-        if ESSENTIA_AVAILABLE:
-            try:
-                bpm, beats = self._detect_bpm_essentia(audio_path, y, sr)
-                logger.debug("Using essentia BPM detection")
-            except Exception as e:
-                logger.warning("Essentia BPM detection failed: %s, falling back to aubio", e)
-                if AUBIO_AVAILABLE:
-                    bpm, beats = self._detect_bpm_aubio(audio_path, y, sr)
-                else:
+        # Use consensus BPM detection for improved accuracy
+        consensus_detector = ConsensusBpmDetector(
+            min_bpm=60.0,
+            max_bpm=200.0,
+            expected_range=(120.0, 145.0),  # EDM typical range
+            octave_tolerance=0.1,
+        )
+
+        try:
+            # Ensure mono float32 for consensus detector
+            y_mono = y if y.ndim == 1 else np.mean(y, axis=1)
+            y_mono = y_mono.astype(np.float32)
+
+            bpm_estimate = consensus_detector.detect(y_mono, sr)
+            bpm = bpm_estimate.bpm
+            beats = bpm_estimate.beats
+
+            logger.info(
+                "BPM detected: %.1f (confidence: %.1f%%, consensus from %d methods)",
+                bpm,
+                bpm_estimate.confidence * 100,
+                bpm_estimate.metadata.get("num_methods", 1),
+            )
+
+            # Log if low confidence
+            if bpm_estimate.confidence < 0.6:
+                logger.warning(
+                    "Low BPM confidence (%.1f%%) - consider manual verification",
+                    bpm_estimate.confidence * 100,
+                )
+
+            # If consensus didn't provide beats, generate them
+            if beats is None:
+                logger.warning("Consensus didn't provide beat positions, generating from BPM")
+                import librosa
+                _, beats = librosa.beat.beat_track(y=y_mono, sr=sr, start_bpm=bpm, tightness=100)
+
+        except Exception as e:
+            logger.error("Consensus BPM detection failed: %s", e)
+            # Ultimate fallback to single method
+            logger.warning("Falling back to single-method BPM detection")
+            if ESSENTIA_AVAILABLE:
+                try:
+                    bpm, beats = self._detect_bpm_essentia(audio_path, y, sr)
+                except Exception as e2:
+                    logger.warning("Essentia fallback failed: %s", e2)
                     bpm, beats = self._detect_bpm_librosa(y, sr)
-        elif AUBIO_AVAILABLE:
-            try:
-                bpm, beats = self._detect_bpm_aubio(audio_path, y, sr)
-                logger.debug("Using aubio BPM detection")
-            except Exception as e:
-                logger.warning("Aubio BPM detection failed: %s, falling back to librosa", e)
+            else:
                 bpm, beats = self._detect_bpm_librosa(y, sr)
-        else:
-            bpm, beats = self._detect_bpm_librosa(y, sr)
 
         beat_times = librosa.frames_to_time(beats, sr=sr)
 
@@ -540,7 +570,11 @@ class AudioAnalyzer:
         features: dict[str, np.ndarray],
     ) -> list[float]:
         """
-        Detect drop points (sudden energy increases).
+        Detect drop points (beat/bass returns after breakdowns or track start).
+
+        In EDM, a "drop" is when the beat/bass returns in full force, either:
+        1. Initial drop: First strong beat establishment
+        2. Post-breakdown drop: Beat returns after being stripped away
 
         Args:
             energy: Overall energy curve
@@ -552,99 +586,119 @@ class AudioAnalyzer:
             List of timestamps where drops occur.
         """
         drops = []
-
-        # Pre-calculate energy statistics (used in both branches)
-        mean_energy = np.mean(energy)
-        std_energy = np.std(energy)
-        max_energy = np.max(energy)
         min_spacing = bar_duration * self.config.drop_min_spacing_bars
 
-        # Use onset detection if available for more precise timing
-        use_onsets = "onset_times" in features and "onset_strength" in features
-        logger.debug("Drop detection mode: %s", "onset-based" if use_onsets else "energy-based")
+        # Check available features
+        has_onsets = "onset_times" in features and "onset_strength" in features
 
-        if use_onsets:
-            onset_times = features["onset_times"]
-            onset_strength = features["onset_strength"]
+        if not has_onsets:
+            logger.warning("No onset detection available, drop detection may be inaccurate")
+            return drops
 
-            # Pre-calculate onset statistics
-            mean_onset = np.mean(onset_strength)
-            std_onset = np.std(onset_strength)
-            onset_threshold = mean_onset + std_onset * self.config.drop_onset_strength_std
-            energy_std_threshold = mean_energy + std_energy * self.config.drop_energy_std
-            max_energy_threshold = max_energy * self.config.drop_max_energy_threshold
+        # Get features
+        onset_times = features["onset_times"]
+        onset_strength = features["onset_strength"]
+        low_energy = features.get("low_energy", energy)  # Fallback to overall energy
+        percussive_energy = features.get("percussive_energy", energy)
 
-            # Calculate lookback frames based on seconds
-            lookback_frames = int(
-                self.config.drop_lookback_seconds / self.config.energy_window_seconds
+        # Align low_energy and percussive_energy to times array
+        from scipy import interpolate
+
+        if len(low_energy) != len(times):
+            low_energy_interp = interpolate.interp1d(
+                np.linspace(0, times[-1], len(low_energy)),
+                low_energy,
+                kind="linear",
+                fill_value="extrapolate",
             )
+            low_energy = low_energy_interp(times)
 
-            # Look for strong onsets that coincide with high energy
-            for onset_time in onset_times:
-                # Find closest energy frame
-                idx = np.argmin(np.abs(times - onset_time))
-
-                if idx < lookback_frames or idx >= len(energy) - 5:
-                    continue
-
-                # Find onset strength at this time
-                onset_idx = int(onset_time * len(onset_strength) / times[-1])
-                if onset_idx >= len(onset_strength):
-                    continue
-
-                # Check if this onset has high energy characteristics AND strong onset
-                # Use configurable lookback window
-                recent_avg = np.mean(energy[max(0, idx - lookback_frames) : idx])
-
-                # Require BOTH strong onset AND high energy (using pre-calculated thresholds)
-                if (
-                    onset_strength[onset_idx] > onset_threshold
-                    and energy[idx] > recent_avg * self.config.drop_energy_multiplier
-                    and energy[idx] > energy_std_threshold
-                    and energy[idx] > max_energy_threshold
-                    and (not drops or (onset_time - drops[-1]) > min_spacing)
-                ):
-                    # Look backward to find the actual onset (start of energy rise)
-                    onset_search_idx = idx
-                    for j in range(idx - 1, max(0, idx - lookback_frames // 2), -1):
-                        if energy[j] < recent_avg * 1.05:  # Found the base before the rise
-                            onset_search_idx = j + 1
-                            break
-
-                    drops.append(float(times[onset_search_idx]))
-                    logger.debug(
-                        "Drop detected at %.2fs (onset: %.2fs, peak: %.2fs)",
-                        times[onset_search_idx],
-                        onset_time,
-                        times[idx],
-                    )
-        else:
-            # Fallback to energy-based detection
-            energy_std_threshold = mean_energy + std_energy * self.config.drop_energy_std
-            lookback_frames = int(
-                self.config.drop_lookback_seconds / self.config.energy_window_seconds
+        if len(percussive_energy) != len(times):
+            perc_energy_interp = interpolate.interp1d(
+                np.linspace(0, times[-1], len(percussive_energy)),
+                percussive_energy,
+                kind="linear",
+                fill_value="extrapolate",
             )
+            percussive_energy = perc_energy_interp(times)
 
-            for i in range(lookback_frames, len(energy) - 5):
-                recent_avg = np.mean(energy[max(0, i - lookback_frames) : i])
+        # Calculate statistics
+        mean_low = np.mean(low_energy)
+        std_low = np.std(low_energy)
+        mean_perc = np.mean(percussive_energy)
+        std_perc = np.std(percussive_energy)
+        mean_onset = np.mean(onset_strength)
+        std_onset = np.std(onset_strength)
 
-                if (
-                    energy[i] > recent_avg * self.config.drop_energy_multiplier
-                    and energy[i] > energy_std_threshold
-                    and energy[i] > max_energy * 0.65
-                ):  # Slightly stricter for fallback
-                    window_start = max(0, i - 2)
-                    window_end = min(len(energy), i + 3)
-                    if energy[i] == np.max(energy[window_start:window_end]) and (
-                        not drops or (times[i] - drops[-1]) > min_spacing
-                    ):
-                        # Use the onset (start of jump) rather than the peak
-                        onset_idx = i
-                        for j in range(i - 1, max(0, i - lookback_frames // 2), -1):
-                            if energy[j] < recent_avg * 1.1:
-                                onset_idx = j + 1
-                                break
-                        drops.append(float(times[onset_idx]))
+        # Thresholds for "significant" bass/beat presence
+        # Lower threshold - bass doesn't need to be super loud
+        low_threshold = mean_low + 0.3 * std_low
+        perc_threshold = mean_perc + 0.3 * std_perc
+        onset_threshold = mean_onset + 0.8 * std_onset  # Strong onset required
+
+        logger.debug(
+            "Drop detection: Low threshold=%.4f, Perc threshold=%.4f, Onset threshold=%.4f",
+            low_threshold,
+            perc_threshold,
+            onset_threshold,
+        )
+
+        # Strategy: Find strong onsets where bass/percussion RETURNS after being low
+        lookback_seconds = 8.0  # Look back 8 seconds to see if bass was low
+        lookback_frames = int(lookback_seconds / self.config.energy_window_seconds)
+
+        for onset_time in onset_times:
+            # Find closest time index
+            idx = np.argmin(np.abs(times - onset_time))
+
+            if idx < lookback_frames or idx >= len(times) - 2:
+                continue
+
+            # Get onset strength
+            onset_idx = int(onset_time * len(onset_strength) / times[-1])
+            if onset_idx >= len(onset_strength):
+                continue
+
+            # Check if this is a strong onset
+            if onset_strength[onset_idx] < onset_threshold:
+                continue
+
+            # Check if low-frequency (bass) and percussion are present at drop
+            has_bass = low_energy[idx] > low_threshold
+            has_beat = percussive_energy[idx] > perc_threshold
+
+            if not (has_bass and has_beat):
+                continue
+
+            # KEY: Check if bass/percussion were LOW recently (breakdown before drop)
+            # or if this is the first strong bass/beat (initial drop)
+            lookback_start = max(0, idx - lookback_frames)
+            recent_low_avg = np.mean(low_energy[lookback_start:idx])
+            recent_perc_avg = np.mean(percussive_energy[lookback_start:idx])
+
+            # Drop detected if:
+            # 1. Bass/beat are NOW strong, AND
+            # 2. Bass/beat were recently weak (indicating a return/drop moment)
+            bass_increase = low_energy[idx] > recent_low_avg * 1.4
+            beat_increase = percussive_energy[idx] > recent_perc_avg * 1.3
+
+            # Also allow early track drops where bass simply starts strong
+            is_early_drop = onset_time < 60  # First minute
+            bass_strong = low_energy[idx] > mean_low + std_low
+
+            # Check minimum spacing and add drop
+            is_valid_drop = (bass_increase and beat_increase) or (
+                is_early_drop and bass_strong and has_beat
+            )
+            if is_valid_drop and (not drops or (onset_time - drops[-1]) > min_spacing):
+                drops.append(float(onset_time))
+                logger.debug(
+                    "Drop detected at %.2fs (low: %.4f, perc: %.4f, onset: %.4f)",
+                    onset_time,
+                    low_energy[idx],
+                    percussive_energy[idx],
+                    onset_strength[onset_idx],
+                )
 
         return drops
 

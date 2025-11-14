@@ -93,13 +93,24 @@
             "duration_seconds": 450,
             "bpm": 120.0,
             "manual_labels": {
-                "drops": [32, 303],
-                "breakdowns": [256],
+                "drops": [
+                    32,
+                    303
+                ],
+                "breakdowns": [
+                    256
+                ],
                 "builds": [],
                 "notes": "Manual: drops at 32s and 5m3s (303s), breakdown at 4m16s (256s), no builds"
             },
             "detected": {
-                "drops": [35, 185, 251, 319, 439],
+                "drops": [
+                    35,
+                    185,
+                    251,
+                    319,
+                    439
+                ],
                 "breakdowns": [],
                 "builds": []
             },
@@ -126,13 +137,27 @@
             "duration_seconds": 368,
             "bpm": 137.0,
             "manual_labels": {
-                "drops": [27, 111, 236],
-                "breakdowns": [83, 222],
+                "drops": [
+                    27,
+                    111,
+                    236
+                ],
+                "breakdowns": [
+                    83,
+                    222
+                ],
                 "builds": [],
                 "notes": "Manual: drops at 27s, 1m51s (111s), 3m56s (236s); breakdowns at 1m23s (83s), 3m42s (222s)"
             },
             "detected": {
-                "drops": [27, 76, 136, 186, 235, 298],
+                "drops": [
+                    27,
+                    76,
+                    136,
+                    186,
+                    235,
+                    298
+                ],
                 "breakdowns": [],
                 "builds": []
             },
@@ -159,13 +184,23 @@
             "duration_seconds": 217,
             "bpm": 124.0,
             "manual_labels": {
-                "drops": [1, 123],
-                "breakdowns": [55],
-                "builds": [78],
+                "drops": [
+                    1,
+                    123
+                ],
+                "breakdowns": [
+                    55
+                ],
+                "builds": [
+                    78
+                ],
                 "notes": "Manual: drops at 1s, 2m3s (123s); breakdown at 55s; build at approximately 1m18s (78s)"
             },
             "detected": {
-                "drops": [5, 154],
+                "drops": [
+                    5,
+                    154
+                ],
                 "breakdowns": [],
                 "builds": []
             },
