@@ -3,6 +3,9 @@
   "build": {
     "dockerfile": "Dockerfile"
   },
+  "mounts": [
+    "source=/mnt/c/Music/Library,target=/music,type=bind,consistency=cached"
+  ],
   "postCreateCommand": "pip install -e .[dev]",
   "customizations": {
     "vscode": {
