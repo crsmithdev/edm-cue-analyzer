@@ -217,6 +217,31 @@ make clean         # Clean build artifacts
 **Optional (Dev Container):**
 - **essentia** - Advanced BPM detection optimized for EDM (Linux only)
 
+**Validation Tools (Optional):**
+- **aiohttp**, **beautifulsoup4**, **lxml** - For BPM validation against online databases
+
+To install with validation tools:
+```bash
+pip install -e ".[validation]"
+```
+
+## BPM Validation
+
+Test detection accuracy against online BPM databases:
+
+```bash
+# Install validation dependencies
+pip install -e ".[validation]"
+
+# Run validation on your music library
+python validate_bpm_accuracy.py /path/to/music/library
+
+# Test a sample of 20 files
+python validate_bpm_accuracy.py /path/to/music/library --max-files 20
+```
+
+See [BPM_VALIDATION.md](BPM_VALIDATION.md) for detailed documentation.
+
 ## Contributing
 
 Contributions are welcome! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
@@ -228,6 +253,8 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 ## Documentation
 
 - [Quick Start Guide](docs/QUICK_START.md)
+- [Library Usage Guide](docs/LIBRARY_USAGE.md)
+- [BPM Validation Tool](BPM_VALIDATION.md)
 - [Project Summary](docs/PROJECT_SUMMARY.md)
 - [Examples](examples/)
 
