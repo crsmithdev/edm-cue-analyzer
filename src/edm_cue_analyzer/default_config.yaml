@@ -132,3 +132,7 @@ display:
   show_waveform: true
   waveform_width: 80
   color_enabled: true
+
+# BPM Detection
+# Number of decimal places for BPM (0 = integer, 1 = one decimal, 2 = two decimals)
+bpm_precision: 1

@@ -63,6 +63,7 @@ class Config:
     analysis: AnalysisConfig = field(default_factory=AnalysisConfig)
     rekordbox_colors: dict[str, str] = field(default_factory=dict)
     display: dict[str, Any] = field(default_factory=dict)
+    bpm_precision: int = 1  # Number of decimal places for BPM (0 = integer, 1 = one decimal, etc.)
 
 
 def load_config(config_path: Path | None = None) -> Config:
@@ -126,12 +127,16 @@ def load_config(config_path: Path | None = None) -> Config:
     # Parse display settings
     display = raw_config.get("display", {})
 
+    # Parse BPM precision
+    bpm_precision = raw_config.get("bpm_precision", 1)
+
     return Config(
         hot_cues=hot_cues,
         memory_cues=memory_cues,
         analysis=analysis,
         rekordbox_colors=rekordbox_colors,
         display=display,
+        bpm_precision=bpm_precision,
     )
 
 

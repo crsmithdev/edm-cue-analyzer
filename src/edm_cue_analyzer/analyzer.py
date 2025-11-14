@@ -7,6 +7,7 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from functools import wraps
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 import librosa
 import numpy as np
@@ -14,6 +15,9 @@ import soundfile as sf
 
 from .config import AnalysisConfig
 from .consensus import ConsensusBpmDetector
+
+if TYPE_CHECKING:
+    from .config import Config
 
 logger = logging.getLogger(__name__)
 
@@ -359,16 +363,23 @@ class AudioAnalyzer:
     """
 
     def __init__(
-        self, config: AnalysisConfig, feature_extractors: list[FeatureExtractor] | None = None
+        self, config: "AnalysisConfig | Config", feature_extractors: list[FeatureExtractor] | None = None
     ):
         """
         Initialize analyzer with configuration and optional feature extractors.
 
         Args:
-            config: Analysis configuration
+            config: Analysis configuration (AnalysisConfig) or full Config object
             feature_extractors: List of feature extractor plugins (default: HPSS + Spectral)
         """
-        self.config = config
+        # Handle both AnalysisConfig and full Config objects
+        from .config import Config as ConfigClass
+        if isinstance(config, ConfigClass):
+            self.full_config = config
+            self.config = config.analysis
+        else:
+            self.full_config = None
+            self.config = config
 
         # Default feature extractors - use Essentia when available for better EDM analysis
         if feature_extractors is None:
@@ -494,8 +505,13 @@ class AudioAnalyzer:
         bpm_result = results.get("bpm")
         energy_result = results.get("energy")
 
+        # Apply BPM precision rounding
+        bpm = bpm_result.bpm if bpm_result else 0.0
+        if bpm > 0 and self.full_config:
+            bpm = round(bpm, self.full_config.bpm_precision)
+
         return TrackStructure(
-            bpm=bpm_result.bpm if bpm_result else 0.0,
+            bpm=bpm,
             duration=duration,
             beats=bpm_result.beats if bpm_result else np.array([]),
             bar_duration=bpm_result.bar_duration if bpm_result else 0.0,

@@ -34,7 +34,7 @@ dependencies = [
 essentia = ["essentia>=2.1b5"]
 dev = ["pytest>=7.0", "pytest-cov>=4.0", "ruff>=0.3.0", "mypy>=1.8.0"]
 # Validation tools for testing accuracy against online BPM databases
-validation = ["aiohttp>=3.8.0", "beautifulsoup4>=4.12.0", "lxml>=4.9.0"]
+validation = ["aiohttp>=3.8.0", "beautifulsoup4>=4.12.0", "lxml>=4.9.0", "mutagen>=1.45.0"]
 
 [project.scripts]
 edm-cue-analyzer = "edm_cue_analyzer.cli:main"

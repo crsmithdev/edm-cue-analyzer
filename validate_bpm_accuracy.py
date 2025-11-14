@@ -23,6 +23,7 @@ from urllib.parse import quote
 
 import aiohttp
 from bs4 import BeautifulSoup
+from mutagen import File as MutagenFile
 
 from edm_cue_analyzer import AudioAnalyzer
 from edm_cue_analyzer.config import get_default_config
@@ -95,13 +96,55 @@ class BpmFetcher:
     
     def _parse_filename(self, filepath: Path) -> tuple[str, str]:
         """
-        Extract artist and title from filename.
+        Extract artist and title from file metadata or filename.
+        
+        Priority:
+        1. ID3/Vorbis/FLAC tags (artist, title)
+        2. Filename parsing
         
         Handles common patterns:
         - "Artist - Title.flac"
         - "01. Artist - Title.mp3"
         - "Artist_-_Title.wav"
         """
+        # Try to read metadata tags first
+        try:
+            audio = MutagenFile(filepath)
+            if audio is not None:
+                artist = None
+                title = None
+                
+                # Try different tag formats
+                # FLAC/Vorbis Comments
+                if 'artist' in audio:
+                    artist = str(audio['artist'][0]) if isinstance(audio['artist'], list) else str(audio['artist'])
+                if 'title' in audio:
+                    title = str(audio['title'][0]) if isinstance(audio['title'], list) else str(audio['title'])
+                
+                # ID3 tags (MP3)
+                if hasattr(audio, 'tags') and audio.tags:
+                    if 'TPE1' in audio.tags:  # Artist
+                        artist = str(audio.tags['TPE1'])
+                    if 'TIT2' in audio.tags:  # Title
+                        title = str(audio.tags['TIT2'])
+                
+                # MP4/M4A tags
+                if '\xa9ART' in audio:
+                    artist = str(audio['\xa9ART'][0]) if isinstance(audio['\xa9ART'], list) else str(audio['\xa9ART'])
+                if '\xa9nam' in audio:
+                    title = str(audio['\xa9nam'][0]) if isinstance(audio['\xa9nam'], list) else str(audio['\xa9nam'])
+                
+                if artist and title:
+                    logger.debug(f"Using tags: {artist} - {title}")
+                    return artist.strip(), title.strip()
+                elif title:
+                    # Have title but no artist
+                    logger.debug(f"Using tag title only: {title}")
+                    return "", title.strip()
+        except Exception as e:
+            logger.debug(f"Failed to read tags from {filepath.name}: {e}")
+        
+        # Fall back to filename parsing
         name = filepath.stem
         
         # Remove track numbers (e.g., "01. ", "01 - ", "1. ")
@@ -259,33 +302,62 @@ async def validate_file(
 ) -> BpmValidation:
     """Validate BPM detection for a single file."""
     
-    # Parse filename
+    # Parse filename and tags
     artist, title = fetcher._parse_filename(filepath)
     
     logger.info(f"Processing: {artist} - {title}")
     
     try:
-        # Fetch reference BPM from online sources
-        reference_result = await fetcher.fetch_bpm(artist, title)
+        # First, try to get BPM from file tags
+        reference_bpm = None
+        source = None
         
-        if reference_result is None:
-            logger.warning(f"No online BPM found for: {artist} - {title}")
-            return BpmValidation(
-                filepath=str(filepath),
-                artist=artist,
-                title=title,
-                detected_bpm=0.0,
-                reference_bpm=None,
-                source=None,
-                error_bpm=None,
-                error_percent=None,
-                analysis_time=0.0,
-                success=False,
-                error_message="No reference BPM found online"
-            )
+        try:
+            audio = MutagenFile(filepath)
+            if audio is not None:
+                # Check for BPM tag
+                bpm_tag = None
+                if 'bpm' in audio:
+                    bpm_tag = audio['bpm']
+                elif hasattr(audio, 'tags') and audio.tags and 'TBPM' in audio.tags:  # ID3
+                    bpm_tag = audio.tags['TBPM']
+                elif 'tmpo' in audio:  # MP4
+                    bpm_tag = audio['tmpo']
+                
+                if bpm_tag:
+                    # Extract numeric BPM
+                    bpm_str = str(bpm_tag[0]) if isinstance(bpm_tag, list) else str(bpm_tag)
+                    try:
+                        reference_bpm = float(bpm_str)
+                        source = "File Tags"
+                        logger.info(f"BPM from file tags: {reference_bpm}")
+                    except ValueError:
+                        logger.debug(f"Could not parse BPM tag: {bpm_str}")
+        except Exception as e:
+            logger.debug(f"Failed to read BPM from tags: {e}")
         
-        reference_bpm, source = reference_result
-        logger.info(f"Reference BPM: {reference_bpm} ({source})")
+        # If no BPM in tags, fetch from online sources
+        if reference_bpm is None:
+            reference_result = await fetcher.fetch_bpm(artist, title)
+            
+            if reference_result is None:
+                logger.warning(f"No reference BPM found for: {artist} - {title}")
+                return BpmValidation(
+                    filepath=str(filepath),
+                    artist=artist,
+                    title=title,
+                    detected_bpm=0.0,
+                    reference_bpm=None,
+                    source=None,
+                    error_bpm=None,
+                    error_percent=None,
+                    analysis_time=0.0,
+                    success=False,
+                    error_message="No reference BPM found (tags or online)"
+                )
+            
+            reference_bpm, source = reference_result
+            logger.info(f"Reference BPM: {reference_bpm} ({source})")
         
         # Detect BPM using analyzer
         start_time = time.perf_counter()

@@ -120,7 +120,7 @@ async def analyze_track(
             logger.info("Analyzing: %s", filepath.name)
 
         # Analyze audio
-        analyzer = AudioAnalyzer(config.analysis)
+        analyzer = AudioAnalyzer(config)  # Pass full config instead of just config.analysis
 
         # Determine which analyses to run
         if bpm_only:
@@ -374,6 +374,14 @@ Examples:
     parser.add_argument("--verbose", action="store_true", help="Enable verbose debug logging")
 
     parser.add_argument(
+        "--bpm-precision",
+        type=int,
+        choices=[0, 1, 2],
+        default=None,
+        help="BPM decimal precision (0=integer, 1=one decimal [default], 2=two decimals)",
+    )
+
+    parser.add_argument(
         "--log-file",
         type=Path,
         help="Append all output (stdout and logs) to specified file",
@@ -447,6 +455,10 @@ Examples:
     except Exception as e:
         logger.error("Error loading configuration: %s", e, exc_info=True)
         return 1
+
+    # Override BPM precision if specified on command line
+    if args.bpm_precision is not None:
+        config.bpm_precision = args.bpm_precision
 
     # Analyze tracks
     return asyncio.run(
