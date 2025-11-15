@@ -64,7 +64,7 @@ class TestCueGenerator:
     def mock_structure(self):
         """Create a mock track structure for testing."""
         return TrackStructure(
-            bpm=128.0,
+            detected_bpm=128.0,
             duration=300.0,  # 5 minutes
             beats=np.array([0.0, 0.46875, 0.9375]),  # Mock beat times
             bar_duration=1.875,
@@ -138,7 +138,7 @@ class TestIntegration:
         
         # Create mock structure
         structure = TrackStructure(
-            bpm=140.0,
+            detected_bpm=140.0,
             duration=360.0,
             beats=np.array([]),
             bar_duration=1.714,

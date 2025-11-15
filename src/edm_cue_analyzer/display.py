@@ -44,7 +44,8 @@ class TerminalDisplay:
     def _print_track_info(self, filepath: str, structure: TrackStructure):
         """Print basic track information."""
         print(f"{Fore.GREEN}Track:{Style.RESET_ALL} {filepath}")
-        print(f"{Fore.GREEN}BPM:{Style.RESET_ALL} {structure.bpm:.1f}")
+        effective_bpm = structure.reference_bpm if structure.reference_bpm is not None else structure.detected_bpm
+        print(f"{Fore.GREEN}BPM:{Style.RESET_ALL} {effective_bpm:.1f}")
         print(f"{Fore.GREEN}Duration:{Style.RESET_ALL} {self._format_time(structure.duration)}")
         print(f"{Fore.GREEN}Bar Duration:{Style.RESET_ALL} {structure.bar_duration:.2f}s")
         print()

@@ -83,16 +83,25 @@ if not ESSENTIA_AVAILABLE:
 
 @dataclass
 class TrackStructure:
-    """Detected structure elements of a track."""
+    """Detected structure elements of a track.
 
-    bpm: float
+    Stores both the raw detected BPM (from audio analysis) and an optional
+    reference BPM (for example, from file tags). The legacy `bpm` keyword
+    is still accepted for compatibility.
+    """
+
+    # Basic timing (required)
     duration: float
     beats: np.ndarray
     bar_duration: float
 
-    # Energy profile
+    # Energy profile (required)
     energy_curve: np.ndarray
     energy_times: np.ndarray
+
+    # BPM values (optional/defaults)
+    detected_bpm: float = 0.0
+    reference_bpm: float | None = None
 
     # Detected sections
     drops: list[float] = None
@@ -102,6 +111,8 @@ class TrackStructure:
     # Feature storage - extensible dictionary for all features
     features: dict[str, np.ndarray] = field(default_factory=dict)
 
+    # No legacy `bpm` field — use explicit detected_bpm and reference_bpm
+
     def __post_init__(self):
         if self.drops is None:
             self.drops = []
@@ -109,6 +120,16 @@ class TrackStructure:
             self.breakdowns = []
         if self.builds is None:
             self.builds = []
+
+        # No legacy `bpm` handling — callers should use detected_bpm or
+        # reference_bpm explicitly. Nothing to do here.
+
+    @property
+    def bpm(self) -> float:
+        """Return the BPM to use by default: reference if available, else detected."""
+        return self.reference_bpm if (self.reference_bpm is not None and self.reference_bpm > 0) else self.detected_bpm
+    # Note: legacy `bpm` compatibility removed. Use structure.detected_bpm or
+    # structure.reference_bpm explicitly.
 
 
 class FeatureExtractor(ABC):
@@ -479,6 +500,32 @@ class AudioAnalyzer:
             "features": {},  # Will be populated by feature extractors if needed
         }
 
+        # Attempt to read local metadata (tags) for this file. Prefer using
+        # a BPM from file tags as a reference if present. We keep detection
+        # running (so features/beats are still computed) but will expose
+        # the file-tag BPM as reference_bpm on the returned TrackStructure.
+        try:
+            from .metadata.local import LocalFileProvider
+
+            provider = LocalFileProvider()
+            # LocalFileProvider.get_metadata is async
+            try:
+                local_meta = await provider.get_metadata(file_path=audio_path)
+            except TypeError:
+                # Some provider implementations might be sync; call in thread
+                local_meta = await asyncio.to_thread(provider.get_metadata, file_path=audio_path)
+
+            if local_meta is not None:
+                context["local_metadata"] = local_meta
+                if getattr(local_meta, "bpm", None) is not None:
+                    logger.info(
+                        "Found BPM from local tags: %.2f BPM (will be available as reference)",
+                        float(local_meta.bpm),
+                    )
+        except Exception as e:
+            # If local metadata provider or mutagen isn't available, continue silently
+            logger.debug("Local metadata provider not used: %s", e)
+
         # Run analyses in dependency order
         results = {}
         for analysis_name in execution_order:
@@ -505,13 +552,32 @@ class AudioAnalyzer:
         bpm_result = results.get("bpm")
         energy_result = results.get("energy")
 
-        # Apply BPM precision rounding
-        bpm = bpm_result.bpm if bpm_result else 0.0
-        if bpm > 0 and self.full_config:
-            bpm = round(bpm, self.full_config.bpm_precision)
+        # Detected BPM (from audio analysis)
+        detected_bpm = bpm_result.bpm if bpm_result else 0.0
+
+        # Apply configured precision to detected BPM
+        if detected_bpm > 0 and self.full_config:
+            detected_bpm = round(detected_bpm, self.full_config.bpm_precision)
+
+        # Reference BPM from tags (if available)
+        reference_bpm = None
+        local_meta = context.get("local_metadata")
+        if local_meta and getattr(local_meta, "bpm", None) is not None:
+            try:
+                reference_bpm = float(local_meta.bpm)
+                if self.full_config:
+                    reference_bpm = round(reference_bpm, self.full_config.bpm_precision)
+                logger.info(
+                    "Using BPM from file tags as reference: %.2f BPM (detected: %.2f BPM)",
+                    reference_bpm,
+                    detected_bpm,
+                )
+            except Exception:
+                logger.debug("Invalid BPM tag value in metadata, ignoring")
 
         return TrackStructure(
-            bpm=bpm,
+            detected_bpm=detected_bpm,
+            reference_bpm=reference_bpm,
             duration=duration,
             beats=bpm_result.beats if bpm_result else np.array([]),
             bar_duration=bpm_result.bar_duration if bpm_result else 0.0,

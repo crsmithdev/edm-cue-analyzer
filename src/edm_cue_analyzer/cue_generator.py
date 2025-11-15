@@ -46,7 +46,8 @@ class CueGenerator:
                 if position is not None:
                     loop_length = None
                     if cue_config.loop_bars:
-                        loop_length = bars_to_seconds(cue_config.loop_bars, structure.bpm)
+                        bpm_val = structure.reference_bpm if structure.reference_bpm is not None else structure.detected_bpm
+                        loop_length = bars_to_seconds(cue_config.loop_bars, bpm_val)
 
                     cues.append(
                         CuePoint(
@@ -84,7 +85,8 @@ class CueGenerator:
 
         # Apply offset if position was found
         if position is not None and cue_config.offset_bars != 0:
-            offset_seconds = bars_to_seconds(abs(cue_config.offset_bars), structure.bpm)
+            bpm_val = structure.reference_bpm if structure.reference_bpm is not None else structure.detected_bpm
+            offset_seconds = bars_to_seconds(abs(cue_config.offset_bars), bpm_val)
             if cue_config.offset_bars < 0:
                 position -= offset_seconds
             else:
@@ -113,7 +115,8 @@ class CueGenerator:
         # Apply offset if specified
         if position is not None and "offset_bars" in cue_dict:
             offset_bars = cue_dict["offset_bars"]
-            offset_seconds = bars_to_seconds(abs(offset_bars), structure.bpm)
+            bpm_val = structure.reference_bpm if structure.reference_bpm is not None else structure.detected_bpm
+            offset_seconds = bars_to_seconds(abs(offset_bars), bpm_val)
             if offset_bars < 0:
                 position -= offset_seconds
             else:

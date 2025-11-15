@@ -1,43 +1,8 @@
-# EDM Cue Analyzer - Project Summary
+# Removed
 
-## What's Been Built
-
-A professional, production-ready Python library and CLI application for automated DJ cue point generation. The system has been completely refactored from the original script into a modular, testable, and configurable architecture.
-
-## Key Improvements from Original
-
-### 1. ✅ Multi-Format Support
-- Now supports .mp3, .flac, .wav, and all formats supported by librosa
-- No hardcoding for specific file types
-
-### 2. ✅ Library + CLI Architecture
-```python
-# Use as library
-from edm_cue_analyzer import AudioAnalyzer, CueGenerator
-analyzer = AudioAnalyzer(config.analysis)
-structure = analyzer.analyze_file(Path("track.flac"))
-
-# Or use as CLI
-$ edm-cue-analyzer track.mp3 -o output.xml
-```
-
-### 3. ✅ Memory Cues + Hot Cues
-- 8 configurable hot cues (A-H)
-- Unlimited memory cues for visual reference
-- Both types fully supported in Rekordbox XML export
-
-### 4. ✅ No Track-Specific Hardcoding
-- All cue positions calculated dynamically
-- Structure detection (drops, breakdowns, builds) fully automated
-- Fallback to percentage-based positioning if structure not detected
-
-### 5. ✅ Fully Configurable System
-- YAML configuration files for easy customization
-- Configure via file OR programmatically in Python
-- Separate configuration for:
-  - Hot cue positions, colors, loop lengths
-  - Memory cue positions
-  - Analysis parameters (thresholds, windows)
+This project-level summary has been consolidated into `docs/ARCHITECTURE.md`.
+Refer to that file for the concise architecture overview and contribution
+guidance.
   - Display settings
 
 ### 6. ✅ Rekordbox XML Export

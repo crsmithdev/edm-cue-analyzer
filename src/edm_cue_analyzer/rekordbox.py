@@ -87,7 +87,7 @@ class RekordboxXMLExporter:
             "BitRate": "320",  # Default assumption
             "SampleRate": "44100",
             "Location": f"file://localhost/{filepath.as_posix()}",
-            "TempoInBpm": f"{structure.bpm:.2f}",
+            "TempoInBpm": f"{(structure.reference_bpm if structure.reference_bpm is not None else structure.detected_bpm):.2f}",
             "DateAdded": datetime.now().strftime("%Y-%m-%d"),
         }
 

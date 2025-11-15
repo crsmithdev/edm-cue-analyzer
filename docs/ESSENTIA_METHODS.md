@@ -1,43 +1,7 @@
-# Essentia RhythmExtractor2013 Methods Explained
+# Removed
 
-## Overview
-
-Essentia's `RhythmExtractor2013` algorithm offers **2 different methods** for beat tracking and BPM detection. Each method uses different onset detection techniques and has different trade-offs between **accuracy** and **speed**.
-
----
-
-## Method Comparison
-
-| Feature | **multifeature** (default) | **degara** |
-|---------|---------------------------|------------|
-| **Accuracy** | ⭐⭐⭐⭐⭐ High (~80% AMLt) | ⭐⭐⭐ Medium (lower than multifeature) |
-| **Speed** | ⭐⭐ Slower | ⭐⭐⭐⭐⭐ Very Fast |
-| **Confidence Score** | ✅ Yes (0-5.32 range) | ❌ No (always 0) |
-| **Onset Functions** | 5 different types | 1 type (complex spectral) |
-| **Use Case** | High-quality analysis | Batch processing |
-| **Best For** | EDM, complex rhythms | Large datasets, simple beats |
-
----
-
-## Method 1: `multifeature` (Default)
-
-### How It Works
-
-Uses **5 different onset detection functions** and combines them for robust beat tracking:
-
-1. **Complex Spectral Difference** (2048/1024 frame/hop, x2 upsampled)
-   - Detects sudden changes in the spectrum
-   - Good for transient-heavy music
-
-2. **Energy Flux (RMS)** (same settings)
-   - Tracks overall energy changes
-   - Catches kick drums and bass hits
-
-3. **Mel-Frequency Spectral Flux** (same settings)
-   - Frequency-weighted spectral changes
-   - Better for perceptually relevant features
-
-4. **Beat Emphasis Function** (2048/512)
+This document has been removed. See `docs/ARCHITECTURE.md` for the
+consolidated architecture summary and any notes about Essentia usage.
    - Emphasizes beat-related frequency bands
    - Focuses on typical percussion ranges
 

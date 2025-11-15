@@ -1,43 +1,7 @@
-# Modular Analysis Architecture
+# Removed
 
-The EDM Cue Analyzer uses a **plugin-based architecture** for audio feature extraction, making it easy to add, remove, or customize analysis methods without modifying core code.
-
-## Overview
-
-### Core Components
-
-1. **FeatureExtractor** - Abstract base class for all feature extractors
-2. **AudioAnalyzer** - Main analyzer that orchestrates feature extraction
-3. **TrackStructure** - Result object with extensible features dictionary
-
-### Built-in Feature Extractors
-
-- **HPSSFeatureExtractor** - Harmonic-Percussive Source Separation
-- **SpectralFeatureExtractor** - Spectral analysis (centroid, frequency bands)
-
-## Architecture Benefits
-
-✅ **Modular** - Add/remove features independently  
-✅ **Extensible** - Create custom extractors without changing core code  
-✅ **Configurable** - Enable only needed features  
-✅ **Performance** - Disable expensive features when not needed  
-✅ **Testable** - Test features in isolation  
-
-## Usage
-
-### Default Configuration
-
-```python
-from edm_cue_analyzer import AudioAnalyzer, load_config
-
-config = load_config()
-analyzer = AudioAnalyzer(config.analysis)
-# Uses: HPSS + Spectral (default)
-
-structure = analyzer.analyze_file(Path("track.mp3"))
-```
-
-### Custom Feature Selection
+This document has been removed. See `docs/ARCHITECTURE.md` for the
+architectural overview and notes on the modular feature extractors.
 
 ```python
 from edm_cue_analyzer import (

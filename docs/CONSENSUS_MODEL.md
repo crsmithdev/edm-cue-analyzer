@@ -1,12 +1,7 @@
-# Consensus-Based Analysis Model
+# Removed
 
-**Last Updated**: November 12, 2025
-
-## Overview
-
-The EDM Cue Analyzer now uses a **consensus-based analysis model** for all critical features, starting with BPM detection. Instead of relying on a single algorithm, the system runs multiple detection methods and combines their results using statistical consensus to achieve higher accuracy and reliability.
-
-## Why Consensus?
+This document has been removed. See `docs/ARCHITECTURE.md` for the consolidated
+architecture overview and guidance on how BPM consensus is implemented.
 
 ### Problems with Single-Method Detection
 

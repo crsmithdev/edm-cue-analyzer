@@ -38,7 +38,9 @@ async def analyze_single_file():
     audio_path = Path("track.flac")
     structure = await analyzer.analyze_file(audio_path)
     
-    print(f"BPM: {structure.bpm}")
+    # Prefer a reference BPM (from tags) when available, else use detected BPM
+    effective_bpm = structure.reference_bpm if structure.reference_bpm is not None else structure.detected_bpm
+    print(f"BPM: {effective_bpm}")
     print(f"Drops: {structure.drops}")
     print(f"Breakdowns: {structure.breakdowns}")
 
@@ -57,7 +59,8 @@ async def analyze_bpm_only():
     audio_path = Path("track.flac")
     structure = await analyzer.analyze_with(audio_path, analyses="bpm-only")
     
-    print(f"BPM: {structure.bpm}")
+    effective_bpm = structure.reference_bpm if structure.reference_bpm is not None else structure.detected_bpm
+    print(f"BPM: {effective_bpm}")
 
 asyncio.run(analyze_bpm_only())
 ```
@@ -155,8 +158,9 @@ def analyze_track_task(file_path: str):
         config = get_default_config()
         analyzer = AudioAnalyzer(config.analysis)
         structure = await analyzer.analyze_file(Path(file_path))
+        effective_bpm = structure.reference_bpm if structure.reference_bpm is not None else structure.detected_bpm
         return {
-            'bpm': structure.bpm,
+            'bpm': effective_bpm,
             'drops': structure.drops,
             'breakdowns': structure.breakdowns,
         }
@@ -194,8 +198,9 @@ async def analyze_upload(file: UploadFile):
     # Analyze
     try:
         structure = await analyzer.analyze_file(temp_path)
+        effective_bpm = structure.reference_bpm if structure.reference_bpm is not None else structure.detected_bpm
         return {
-            "bpm": structure.bpm,
+            "bpm": effective_bpm,
             "duration": structure.duration,
             "drops": structure.drops,
             "breakdowns": structure.breakdowns,
@@ -216,9 +221,10 @@ async def analyze_batch(files: list[UploadFile], max_concurrent: int = 4):
             
             try:
                 structure = await analyzer.analyze_file(temp_path)
+                effective_bpm = structure.reference_bpm if structure.reference_bpm is not None else structure.detected_bpm
                 return {
                     "filename": file.filename,
-                    "bpm": structure.bpm,
+                    "bpm": effective_bpm,
                     "drops": structure.drops,
                 }
             finally:

@@ -37,7 +37,8 @@ def _print_summary(filepath: Path, structure, cues: list, elapsed: float, verbos
     # Basic info always shown
     print(f"\n{'=' * 80}")
     print(f"Track: {filepath.name}")
-    print(f"BPM: {structure.bpm:.1f} | Duration: {_format_time(structure.duration)}")
+    effective_bpm = structure.reference_bpm if structure.reference_bpm is not None else structure.detected_bpm
+    print(f"BPM: {effective_bpm:.1f} | Duration: {_format_time(structure.duration)}")
 
     # Structure summary
     if structure.drops:
@@ -145,7 +146,8 @@ async def analyze_track(
         ):
             elapsed = time.perf_counter() - start_time
             # Output to stdout
-            print(f"\nBPM: {structure.bpm:.1f} | Duration: {_format_time(structure.duration)}")
+            effective_bpm = structure.reference_bpm if structure.reference_bpm is not None else structure.detected_bpm
+            print(f"\nBPM: {effective_bpm:.1f} | Duration: {_format_time(structure.duration)}")
             print(f"Analysis time: {elapsed:.2f}s\n")
             return 0, elapsed
 
