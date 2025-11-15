@@ -1,6 +1,7 @@
 """Core audio analysis functionality."""
 
 import asyncio
+import importlib.util
 import logging
 import time
 from abc import ABC, abstractmethod
@@ -14,7 +15,6 @@ import numpy as np
 import soundfile as sf
 
 from .config import AnalysisConfig
-from .consensus import ConsensusBpmDetector
 
 if TYPE_CHECKING:
     from .config import Config
@@ -72,11 +72,14 @@ except ImportError:
 # Fall back to aubio if essentia not available
 if not ESSENTIA_AVAILABLE:
     try:
-        import aubio
-
-        AUBIO_AVAILABLE = True
-        logger.debug("Aubio available - will use for BPM detection")
-    except ImportError:
+        # Prefer probing availability without importing the full aubio module
+        if importlib.util.find_spec("aubio") is not None:
+            AUBIO_AVAILABLE = True
+            logger.debug("Aubio available - will use for BPM detection")
+        else:
+            AUBIO_AVAILABLE = False
+            logger.debug("Aubio not available - using librosa for BPM detection")
+    except Exception:
         AUBIO_AVAILABLE = False
         logger.debug("Aubio not available - using librosa for BPM detection")
 
@@ -374,11 +377,11 @@ class EssentiaSpectralFeatureExtractor(FeatureExtractor):
 class AudioAnalyzer:
     """
     Analyzes audio files to extract structure and characteristics.
-    
+
     This is a single-file analysis library. It provides async primitives for
     analyzing individual tracks. Batch processing and parallelization across
     multiple files should be handled by the calling code (e.g., CLI, web API).
-    
+
     Internal operations (like BPM consensus detection) may use parallelization
     as an implementation detail, but this is transparent to the caller.
     """
@@ -450,7 +453,7 @@ class AudioAnalyzer:
             FileNotFoundError: If audio file doesn't exist
             ValueError: If unknown analysis requested or circular dependency detected
         """
-        from .analyses import expand_preset, resolve_dependencies, ANALYSES
+        from .analyses import ANALYSES, expand_preset, resolve_dependencies
 
         if not audio_path.exists():
             raise FileNotFoundError(f"Audio file not found: {audio_path}")

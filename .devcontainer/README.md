@@ -50,7 +50,7 @@ pytest
 The analyzer will automatically use the best available method:
 
 1. **Essentia** (best) - MIREX 2013 winner, optimized for EDM
-2. **Aubio** (good) - Fast, reliable fallback  
+2. **Aubio** (good) - Fast, reliable fallback
 3. **Librosa** (basic) - Last resort
 
 ## Benefits

@@ -2,7 +2,6 @@
 
 import asyncio
 from pathlib import Path
-from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
@@ -338,28 +337,28 @@ class TestIntegration:
     @pytest.mark.integration
     async def test_real_getsongbpm(self):
         from edm_cue_analyzer.metadata import GetSongBPMProvider
-        
+
         async with GetSongBPMProvider() as provider:
             result = await provider.get_metadata(
                 artist="Adam Beyer",
                 title="Your Mind"
             )
-            
+
             assert result is not None
             assert result.bpm is not None
             assert result.bpm > 0
-    
+
     @pytest.mark.asyncio
     @pytest.mark.integration
     async def test_real_aggregator(self):
         from edm_cue_analyzer.metadata import MetadataAggregator
-        
+
         async with MetadataAggregator() as agg:
             result = await agg.get_metadata(
                 artist="Charlotte de Witte",
                 title="Selected"
             )
-            
+
             assert result is not None
             assert result.bpm is not None
             assert result.confidence > 0

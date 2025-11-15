@@ -3,7 +3,6 @@
 import asyncio
 import logging
 import re
-from typing import Optional
 from urllib.parse import quote
 
 import aiohttp
@@ -19,7 +18,7 @@ class OnlineProvider(MetadataProvider):
     def __init__(self, timeout: float = 10.0, rate_limit_delay: float = 1.0):
         """
         Initialize online provider.
-        
+
         Args:
             timeout: HTTP request timeout in seconds
             rate_limit_delay: Delay between requests to avoid rate limiting
@@ -27,7 +26,7 @@ class OnlineProvider(MetadataProvider):
         self.timeout = timeout
         self.rate_limit_delay = rate_limit_delay
         self._last_request_time = 0.0
-        self._session: Optional[aiohttp.ClientSession] = None
+        self._session: aiohttp.ClientSession | None = None
 
     @property
     def requires_network(self) -> bool:
@@ -63,7 +62,7 @@ class OnlineProvider(MetadataProvider):
         """Default source placeholder for base class (override in subclasses)."""
         return MetadataSource.CACHED
 
-    async def get_metadata(self, **kwargs) -> Optional[TrackMetadata]:
+    async def get_metadata(self, **kwargs) -> TrackMetadata | None:
         """Base get_metadata raises NotImplementedError by default."""
         raise NotImplementedError("OnlineProvider.get_metadata must be implemented by subclasses")
 
@@ -79,17 +78,17 @@ class GetSongBPMProvider(OnlineProvider):
 
     async def get_metadata(
         self,
-        artist: Optional[str] = None,
-        title: Optional[str] = None,
+        artist: str | None = None,
+        title: str | None = None,
         **kwargs
-    ) -> Optional[TrackMetadata]:
+    ) -> TrackMetadata | None:
         """
         Search GetSongBPM for track metadata.
-        
+
         Args:
             artist: Artist name (required)
             title: Track title (required)
-            
+
         Returns:
             TrackMetadata with BPM and key if found
         """
@@ -98,7 +97,7 @@ class GetSongBPMProvider(OnlineProvider):
             return None
 
         await self._rate_limit()
-        
+
         # Build search URL
         query = f"{artist} {title}".strip()
         search_url = f"{self.BASE_URL}/search?q={quote(query)}"
@@ -111,7 +110,7 @@ class GetSongBPMProvider(OnlineProvider):
                     return None
 
                 html = await response.text()
-                
+
                 # Parse BPM from HTML
                 bpm_match = re.search(r'<span[^>]*>(\d+)\s*BPM</span>', html, re.IGNORECASE)
                 key_match = re.search(r'<span[^>]*>([A-G][#♯♭b]?\s*(?:Major|Minor|maj|min))</span>', html, re.IGNORECASE)
@@ -124,10 +123,10 @@ class GetSongBPMProvider(OnlineProvider):
                         source=self.source,
                         confidence=0.8  # GetSongBPM is generally reliable
                     )
-                    
+
                     if key_match:
                         metadata.key = key_match.group(1).strip()
-                    
+
                     logger.debug(f"GetSongBPM found: {metadata.bpm} BPM")
                     return metadata
 
@@ -153,17 +152,17 @@ class TunebatProvider(OnlineProvider):
 
     async def get_metadata(
         self,
-        artist: Optional[str] = None,
-        title: Optional[str] = None,
+        artist: str | None = None,
+        title: str | None = None,
         **kwargs
-    ) -> Optional[TrackMetadata]:
+    ) -> TrackMetadata | None:
         """
         Search Tunebat for track metadata.
-        
+
         Args:
             artist: Artist name (required)
             title: Track title (required)
-            
+
         Returns:
             TrackMetadata with BPM, key, and duration if found
         """
@@ -172,7 +171,7 @@ class TunebatProvider(OnlineProvider):
             return None
 
         await self._rate_limit()
-        
+
         # Build search URL
         query = f"{artist} {title}".strip()
         search_url = f"{self.BASE_URL}/Search?q={quote(query)}"
@@ -185,7 +184,7 @@ class TunebatProvider(OnlineProvider):
                     return None
 
                 html = await response.text()
-                
+
                 # Parse BPM, key, and duration from HTML
                 bpm_match = re.search(r'<div[^>]*>(\d+)\s*BPM</div>', html, re.IGNORECASE)
                 key_match = re.search(r'<div[^>]*>([A-G][#♯♭b]?\s*(?:Major|Minor))</div>', html, re.IGNORECASE)
@@ -199,15 +198,15 @@ class TunebatProvider(OnlineProvider):
                         source=self.source,
                         confidence=0.85  # Tunebat is very reliable
                     )
-                    
+
                     if key_match:
                         metadata.key = key_match.group(1).strip()
-                    
+
                     if duration_match:
                         minutes = int(duration_match.group(1))
                         seconds = int(duration_match.group(2))
                         metadata.duration = minutes * 60 + seconds
-                    
+
                     logger.debug(f"Tunebat found: {metadata.bpm} BPM")
                     return metadata
 
@@ -233,17 +232,17 @@ class BeatportProvider(OnlineProvider):
 
     async def get_metadata(
         self,
-        artist: Optional[str] = None,
-        title: Optional[str] = None,
+        artist: str | None = None,
+        title: str | None = None,
         **kwargs
-    ) -> Optional[TrackMetadata]:
+    ) -> TrackMetadata | None:
         """
         Search Beatport for track metadata.
-        
+
         Args:
             artist: Artist name (required)
             title: Track title (required)
-            
+
         Returns:
             TrackMetadata with BPM, key, genre if found
         """
@@ -252,7 +251,7 @@ class BeatportProvider(OnlineProvider):
             return None
 
         await self._rate_limit()
-        
+
         # Build search URL
         query = f"{artist} {title}".strip()
         search_url = f"{self.BASE_URL}/search?q={quote(query)}"
@@ -265,7 +264,7 @@ class BeatportProvider(OnlineProvider):
                     return None
 
                 html = await response.text()
-                
+
                 # Parse BPM, key, and genre from HTML
                 # Note: Beatport's HTML structure may require more sophisticated parsing
                 bpm_match = re.search(r'"bpm":\s*(\d+)', html)
@@ -280,13 +279,13 @@ class BeatportProvider(OnlineProvider):
                         source=self.source,
                         confidence=0.9  # Beatport is highly reliable for electronic music
                     )
-                    
+
                     if key_match:
                         metadata.key = key_match.group(1).strip()
-                    
+
                     if genre_match:
                         metadata.genre = genre_match.group(1).strip()
-                    
+
                     logger.debug(f"Beatport found: {metadata.bpm} BPM")
                     return metadata
 

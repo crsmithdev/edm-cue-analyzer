@@ -73,7 +73,7 @@ async with MetadataAggregator() as aggregator:
         artist="Charlotte de Witte",
         title="Selected"
     )
-    
+
     # Results are cached automatically
     print(f"BPM: {metadata.bpm} (confidence: {metadata.confidence:.2f})")
 ```
@@ -119,7 +119,7 @@ async with MetadataAggregator() as aggregator:
         artist=local_meta.artist,
         title=local_meta.title
     )
-    
+
     # Merge: online BPM takes priority, local duration is kept
     merged = local_meta.merge(online_meta)
     print(f"Final BPM: {merged.bpm}")
@@ -183,7 +183,7 @@ class MyMusicDBProvider(OnlineProvider):
     @property
     def source(self) -> MetadataSource:
         return MetadataSource.MUSICBRAINZ  # or add new enum value
-    
+
     async def get_metadata(
         self,
         artist: Optional[str] = None,
@@ -192,14 +192,14 @@ class MyMusicDBProvider(OnlineProvider):
     ) -> Optional[TrackMetadata]:
         if not artist or not title:
             return None
-        
+
         await self._rate_limit()
         session = await self._get_session()
-        
+
         # Your API/scraping logic here
         async with session.get(f"https://api.example.com/search?q={artist}+{title}") as resp:
             data = await resp.json()
-            
+
             return TrackMetadata(
                 artist=artist,
                 title=title,
@@ -216,15 +216,15 @@ from edm_cue_analyzer.metadata import MetadataProvider, MetadataSource, TrackMet
 
 class RekordboxXMLProvider(MetadataProvider):
     """Read metadata from Rekordbox XML export."""
-    
+
     @property
     def source(self) -> MetadataSource:
         return MetadataSource.LOCAL_FILE
-    
+
     @property
     def requires_network(self) -> bool:
         return False
-    
+
     async def get_metadata(self, xml_path: Path, track_id: str, **kwargs) -> Optional[TrackMetadata]:
         # Parse XML and extract metadata
         # ...

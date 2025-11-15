@@ -4,7 +4,6 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
-from typing import Optional
 
 
 class MetadataSource(Enum):
@@ -25,37 +24,37 @@ class TrackMetadata:
     """Container for track metadata from any source."""
 
     # Identifiers
-    artist: Optional[str] = None
-    title: Optional[str] = None
-    album: Optional[str] = None
-    file_path: Optional[Path] = None
+    artist: str | None = None
+    title: str | None = None
+    album: str | None = None
+    file_path: Path | None = None
 
     # Audio properties
-    bpm: Optional[float] = None
-    key: Optional[str] = None
-    duration: Optional[float] = None  # seconds
-    sample_rate: Optional[int] = None
-    
+    bpm: float | None = None
+    key: str | None = None
+    duration: float | None = None  # seconds
+    sample_rate: int | None = None
+
     # Genre/style
-    genre: Optional[str] = None
+    genre: str | None = None
     tags: list[str] = field(default_factory=list)
 
     # Metadata about the metadata
-    source: Optional[MetadataSource] = None
+    source: MetadataSource | None = None
     confidence: float = 1.0  # 0.0 to 1.0
-    timestamp: Optional[str] = None  # ISO format
-    
+    timestamp: str | None = None  # ISO format
+
     # Additional data (provider-specific)
     extra: dict = field(default_factory=dict)
 
     def merge(self, other: "TrackMetadata", prefer_other: bool = False) -> "TrackMetadata":
         """
         Merge this metadata with another, filling in missing fields.
-        
+
         Args:
             other: Another TrackMetadata to merge with
             prefer_other: If True, prefer values from 'other' when both exist
-            
+
         Returns:
             New TrackMetadata with merged values
         """
@@ -104,20 +103,20 @@ class MetadataProvider(ABC):
     @abstractmethod
     async def get_metadata(
         self,
-        artist: Optional[str] = None,
-        title: Optional[str] = None,
-        file_path: Optional[Path] = None,
+        artist: str | None = None,
+        title: str | None = None,
+        file_path: Path | None = None,
         **kwargs
-    ) -> Optional[TrackMetadata]:
+    ) -> TrackMetadata | None:
         """
         Fetch metadata for a track.
-        
+
         Args:
             artist: Artist name (optional)
             title: Track title (optional)
             file_path: Path to audio file (optional)
             **kwargs: Provider-specific parameters
-            
+
         Returns:
             TrackMetadata if found, None otherwise
         """

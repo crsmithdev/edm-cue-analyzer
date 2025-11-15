@@ -24,7 +24,7 @@ from src.edm_cue_analyzer.metadata import (
 async def test_local_file(file_path: Path):
     """Test local file provider."""
     print(f"\n{'=' * 60}")
-    print(f"Testing LocalFileProvider")
+    print("Testing LocalFileProvider")
     print(f"File: {file_path}")
     print('=' * 60)
 
@@ -66,7 +66,7 @@ async def test_online_provider(provider_class, artist: str, title: str):
             print(f"✓ Confidence: {metadata.confidence:.2f}")
             print(f"✓ Source: {metadata.source.value}")
         else:
-            print(f"✗ No metadata found")
+            print("✗ No metadata found")
 
     return metadata
 
@@ -74,7 +74,7 @@ async def test_online_provider(provider_class, artist: str, title: str):
 async def test_aggregator(artist: str, title: str):
     """Test metadata aggregator."""
     print(f"\n{'=' * 60}")
-    print(f"Testing MetadataAggregator (All Sources)")
+    print("Testing MetadataAggregator (All Sources)")
     print(f"Query: {artist} - {title}")
     print('=' * 60)
 
@@ -97,7 +97,7 @@ async def test_aggregator(artist: str, title: str):
             else:
                 print(f"✗ Cache not used (source: {metadata2.source.value})")
         else:
-            print(f"✗ No metadata found")
+            print("✗ No metadata found")
 
     return metadata
 
@@ -152,10 +152,10 @@ async def main():
 Examples:
   # Test online providers
   python test_metadata_providers.py "Adam Beyer" "Your Mind"
-  
+
   # Test local file
   python test_metadata_providers.py --file /music/track.flac
-  
+
   # Test both
   python test_metadata_providers.py "Artist" "Title" --file /music/track.flac
         """

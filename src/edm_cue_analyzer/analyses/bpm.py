@@ -1,6 +1,5 @@
 """BPM and beat detection analysis."""
 
-import asyncio
 import logging
 from dataclasses import dataclass
 from pathlib import Path
@@ -13,7 +12,7 @@ from ..consensus import ConsensusBpmDetector
 logger = logging.getLogger(__name__)
 
 # Import Essentia with proper logging configuration
-from ..essentia_config import es, ESSENTIA_AVAILABLE
+from ..essentia_config import ESSENTIA_AVAILABLE, es  # noqa: E402
 
 
 @dataclass

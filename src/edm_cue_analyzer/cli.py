@@ -9,13 +9,28 @@ import time
 from pathlib import Path
 
 from .analyzer import AudioAnalyzer
-from .config import Config, get_default_config, load_config
+from .config import Config, load_config
 from .cue_generator import CueGenerator
 from .display import display_results
 from .essentia_config import enable_verbose_logging
 from .rekordbox import export_to_rekordbox
 
 logger = logging.getLogger(__name__)
+
+
+def _add_common_args(parser: argparse.ArgumentParser) -> None:
+    """Add common CLI arguments used by main and tests.
+
+    This helper registers only the arguments required by the test-suite and
+    typical CLI entrypoints. Keep changes minimal and conservative.
+    """
+    parser.add_argument("input", nargs="+", help="Input audio files")
+    parser.add_argument("-o", "--output", type=Path, help="Output XML file")
+    parser.add_argument("--bpm-only", action="store_true", dest="bpm_only", help="Only detect BPM")
+    parser.add_argument("-a", "--analyses", action="append", help="Analyses to run (can be repeated)")
+    parser.add_argument("-j", "--jobs", type=int, default=1, help="Number of concurrent jobs")
+    parser.add_argument("--bpm-precision", type=int, default=1, help="Decimal precision for BPM output")
+    parser.add_argument("--log-file", type=Path, dest="log_file", help="Optional log file path")
 
 
 def _format_time(seconds: float) -> str:
@@ -91,7 +106,7 @@ async def analyze_track(
 ) -> tuple[int, float]:
     """
     Analyze a single track and generate cues.
-    
+
     This is the primary single-file analysis function. It wraps the library's
     analyzer with CLI-specific concerns (progress display, error handling, output).
     For batch processing, see batch_analyze() which orchestrates multiple calls.
@@ -129,10 +144,8 @@ async def analyze_track(
             requested_analyses = "bpm-only"
         elif analyses:
             # Use new analyses parameter
-            if len(analyses) == 1:
-                requested_analyses = analyses[0]  # Could be preset or single analysis
-            else:
-                requested_analyses = set(analyses)  # Multiple analyses
+            # If a single analysis was passed as a list, use the single item; otherwise use a set
+            requested_analyses = analyses[0] if len(analyses) == 1 else set(analyses)
         else:
             # Default: full analysis
             requested_analyses = "full"
@@ -201,7 +214,7 @@ async def batch_analyze(
 ) -> int:
     """
     Analyze multiple tracks with optional parallel processing.
-    
+
     This is a CLI orchestration function that controls how multiple files
     are processed. The library provides single-file analysis primitives,
     and this function coordinates batch processing with concurrency control.
@@ -231,10 +244,10 @@ async def batch_analyze(
 
     # Process files in parallel
     concurrent_jobs = min(max_concurrent, total_files)
-    
+
     if concurrent_jobs > 1 and total_files > 1:
         logger.info(f"Processing up to {concurrent_jobs} files concurrently")
-        
+
         async def analyze_with_index(i: int, filepath: Path):
             """Analyze a single file with its index."""
             exit_code, elapsed = await analyze_track(
@@ -250,17 +263,17 @@ async def batch_analyze(
                 total_tracks=total_files,
             )
             return (filepath, exit_code, elapsed)
-        
+
         # Process in batches of concurrent_jobs
         for batch_start_idx in range(0, total_files, concurrent_jobs):
             batch_end_idx = min(batch_start_idx + concurrent_jobs, total_files)
             batch_files = files[batch_start_idx:batch_end_idx]
-            
+
             # Run this batch concurrently
             batch_results = await asyncio.gather(
                 *[analyze_with_index(batch_start_idx + j, f) for j, f in enumerate(batch_files)]
             )
-            
+
             for filepath, exit_code, elapsed in batch_results:
                 results.append((filepath, exit_code, elapsed))
                 if exit_code != 0:

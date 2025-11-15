@@ -10,7 +10,7 @@ import numpy as np
 logger = logging.getLogger(__name__)
 
 # Import Essentia with proper logging configuration
-from .essentia_config import es, ESSENTIA_AVAILABLE
+from .essentia_config import ESSENTIA_AVAILABLE, es  # noqa: E402
 
 # Try to import aubio
 try:
@@ -79,7 +79,7 @@ class ConsensusBpmDetector:
         """
         # Define all detection tasks
         tasks = []
-        
+
         if ESSENTIA_AVAILABLE:
             tasks.extend([
                 ("essentia_rhythm", self._detect_essentia_rhythm_descriptors),
@@ -87,17 +87,17 @@ class ConsensusBpmDetector:
                 ("essentia_degara", self._detect_essentia_degara),
                 ("essentia_percival", self._detect_essentia_percival),
             ])
-        
+
         if AUBIO_AVAILABLE:
             tasks.append(("aubio", self._detect_aubio))
-        
+
         tasks.append(("librosa", self._detect_librosa))
-        
+
         # Run all methods in parallel
         logger.debug(f"Running {len(tasks)} BPM detection methods in parallel...")
-        
+
         import time
-        
+
         async def run_method(name: str, method):
             """Run a single detection method in a thread."""
             start = time.perf_counter()
@@ -113,33 +113,33 @@ class ConsensusBpmDetector:
                 elapsed = time.perf_counter() - start
                 logger.debug(f"{name} failed after {elapsed:.2f}s: {e}")
                 return []
-        
+
         # Execute all methods concurrently
         start_parallel = time.perf_counter()
         results = await asyncio.gather(*[run_method(name, method) for name, method in tasks])
         parallel_time = time.perf_counter() - start_parallel
         logger.debug(f"Parallel execution completed in {parallel_time:.2f}s")
-        
+
         # Flatten results (some methods return lists)
         estimates = []
         for result_list in results:
             estimates.extend(result_list)
-        
+
         if not estimates:
             raise RuntimeError("All BPM detection methods failed")
-        
+
         logger.debug(f"Collected {len(estimates)} BPM estimates")
-        
+
         # Build consensus from all available estimates
         consensus = self._build_consensus(estimates)
-        
+
         logger.info(
             "BPM Consensus: %.1f BPM (confidence: %.2f%%, %d methods agreed)",
             consensus.bpm,
             consensus.confidence * 100,
             len([e for e in estimates if abs(e.bpm - consensus.bpm) < 2]),
         )
-        
+
         return consensus
 
     def detect(self, y: np.ndarray, sr: int) -> BpmEstimate:
@@ -168,7 +168,7 @@ class ConsensusBpmDetector:
     def _detect_essentia_rhythm_descriptors(self, y: np.ndarray, sr: int) -> list[BpmEstimate]:
         """
         Use Essentia RhythmDescriptors for comprehensive analysis.
-        
+
         Returns a list of estimates (may include both first and second peak if significant).
         """
         rhythm_desc = es.RhythmDescriptors()
@@ -191,7 +191,7 @@ class ConsensusBpmDetector:
         beat_frames = librosa.time_to_frames(beats_pos, sr=sr)
 
         estimates = []
-        
+
         # Always add the primary detection
         estimates.append(BpmEstimate(
             bpm=float(bpm),
@@ -205,28 +205,30 @@ class ConsensusBpmDetector:
                 "second_peak_weight": float(second_peak_weight),
             },
         ))
-        
-        # If second peak is significant AND in expected range, add it as alternative
-        if second_peak_weight > 0.25 and second_peak_bpm > 0:
-            if self.expected_range[0] <= second_peak_bpm <= self.expected_range[1]:
-                # Check if it's different enough from first peak
-                if abs(second_peak_bpm - bpm) > 5:
-                    logger.debug(
-                        "RhythmDescriptors: Adding second peak %.1f BPM (weight: %.2f) as alternative",
-                        second_peak_bpm,
-                        second_peak_weight,
-                    )
-                    estimates.append(BpmEstimate(
-                        bpm=float(second_peak_bpm),
-                        confidence=float(second_peak_weight),  # Use peak weight as confidence
-                        method="essentia_rhythm_descriptors_alt",
-                        beats=beat_frames,
-                        metadata={
-                            "peak": "second",
-                            "first_peak_bpm": float(first_peak_bpm),
-                            "second_peak_bpm": float(second_peak_bpm),
-                        },
-                    ))
+
+        # If second peak is significant AND in expected range and sufficiently different, add it
+        if (
+            second_peak_weight > 0.25
+            and second_peak_bpm > 0
+            and self.expected_range[0] <= second_peak_bpm <= self.expected_range[1]
+            and abs(second_peak_bpm - bpm) > 5
+        ):
+            logger.debug(
+                "RhythmDescriptors: Adding second peak %.1f BPM (weight: %.2f) as alternative",
+                second_peak_bpm,
+                second_peak_weight,
+            )
+            estimates.append(BpmEstimate(
+                bpm=float(second_peak_bpm),
+                confidence=float(second_peak_weight),  # Use peak weight as confidence
+                method="essentia_rhythm_descriptors_alt",
+                beats=beat_frames,
+                metadata={
+                    "peak": "second",
+                    "first_peak_bpm": float(first_peak_bpm),
+                    "second_peak_bpm": float(second_peak_bpm),
+                },
+            ))
 
         return estimates
 
@@ -335,12 +337,8 @@ class ConsensusBpmDetector:
             3.0,    # 3:1
             0.333,  # 1:3
         ]
-        
-        for target in relationships:
-            if abs(ratio - target) < self.octave_tolerance:
-                return True
-        
-        return False
+
+        return any(abs(ratio - target) < self.octave_tolerance for target in relationships)
 
     def _build_consensus(self, estimates: list[BpmEstimate]) -> BpmEstimate:
         """
@@ -398,7 +396,7 @@ class ConsensusBpmDetector:
             if estimate.beats is not None:
                 beats = estimate.beats
                 break
-        
+
         # If no method provided beats, we'll need to generate them later
         # (this should rarely happen as most methods provide beats)
         if beats is None:
@@ -473,12 +471,7 @@ class ConsensusBpmDetector:
                     if self.expected_range[0] <= bpm <= self.expected_range[1]
                 ]
 
-                if in_range:
-                    # Use the one in expected range
-                    target_bpm = in_range[0]
-                else:
-                    # Use median of cluster
-                    target_bpm = float(np.median(cluster_bpms))
+                target_bpm = in_range[0] if in_range else float(np.median(cluster_bpms))
 
                 # Correct all estimates in cluster to target BPM
                 for est in cluster_estimates:

@@ -1,13 +1,14 @@
 """Analysis registry and dependency resolution system."""
 
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
-from typing import Callable, Set, Any, Awaitable
+from typing import Any
 
 from .bpm import analyze_bpm
-from .energy import analyze_energy
-from .drops import analyze_drops
 from .breakdowns import analyze_breakdowns
 from .builds import analyze_builds
+from .drops import analyze_drops
+from .energy import analyze_energy
 
 
 @dataclass
@@ -16,7 +17,7 @@ class Analysis:
 
     name: str
     func: Callable[[dict], Awaitable[Any]]
-    dependencies: Set[str]
+    dependencies: set[str]
     description: str
 
 
@@ -62,7 +63,7 @@ ANALYSIS_PRESETS = {
 }
 
 
-def resolve_dependencies(requested: Set[str]) -> list[str]:
+def resolve_dependencies(requested: set[str]) -> list[str]:
     """
     Topologically sort analyses based on dependencies.
 
@@ -106,7 +107,7 @@ def resolve_dependencies(requested: Set[str]) -> list[str]:
     return resolved
 
 
-def expand_preset(analyses: str | Set[str]) -> Set[str]:
+def expand_preset(analyses: str | set[str]) -> set[str]:
     """
     Expand preset name to set of analyses, or pass through explicit set.
 

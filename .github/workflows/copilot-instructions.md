@@ -21,7 +21,7 @@ Early-stage DJ software for EDM track preparation. Current feature: automated cu
 - Ask when requirements are unclear, conflicting, or have significant trade-offs
 - For multiple approaches: briefly present options, recommend one, proceed
 - Don't ask permission for obvious next steps
-- Batch related questions together 
+- Batch related questions together
 
 ### Uncertainty & Confidence
 - Be direct about what you know vs. don't know - say "I don't know" instead of hedging

@@ -7,9 +7,9 @@ try:
     essentia.log.infoActive = False
     essentia.log.warningActive = False
     essentia.log.errorActive = True
-    
+
     import essentia.standard as es
-    
+
     ESSENTIA_AVAILABLE = True
 except ImportError:
     es = None

@@ -4,7 +4,6 @@ import asyncio
 import json
 import logging
 from pathlib import Path
-from typing import Optional
 
 from .base import MetadataProvider, MetadataSource, TrackMetadata
 from .online import BeatportProvider, GetSongBPMProvider, TunebatProvider
@@ -15,7 +14,7 @@ logger = logging.getLogger(__name__)
 class MetadataAggregator:
     """
     Aggregate metadata from multiple providers with caching and consensus logic.
-    
+
     This aggregator:
     - Queries multiple providers concurrently
     - Caches results to disk
@@ -25,13 +24,13 @@ class MetadataAggregator:
 
     def __init__(
         self,
-        providers: Optional[list[MetadataProvider]] = None,
-        cache_path: Optional[Path] = None,
+        providers: list[MetadataProvider] | None = None,
+        cache_path: Path | None = None,
         enable_cache: bool = True,
     ):
         """
         Initialize metadata aggregator.
-        
+
         Args:
             providers: List of metadata providers to use (defaults to all online providers)
             cache_path: Path to cache file (defaults to bpm_cache.json in current dir)
@@ -50,7 +49,7 @@ class MetadataAggregator:
         """Load cache from disk."""
         if self.cache_path.exists():
             try:
-                with open(self.cache_path, 'r') as f:
+                with open(self.cache_path) as f:
                     cache = json.load(f)
                     logger.debug(f"Loaded {len(cache)} cached entries from {self.cache_path}")
                     return cache
@@ -80,16 +79,16 @@ class MetadataAggregator:
         title: str,
         use_cache: bool = True,
         **kwargs
-    ) -> Optional[TrackMetadata]:
+    ) -> TrackMetadata | None:
         """
         Get aggregated metadata from multiple providers.
-        
+
         Args:
             artist: Artist name
             title: Track title
             use_cache: Whether to check/update cache
             **kwargs: Additional arguments passed to providers
-            
+
         Returns:
             Merged TrackMetadata with consensus values
         """
@@ -116,9 +115,9 @@ class MetadataAggregator:
             provider.get_metadata(artist=artist, title=title, **kwargs)
             for provider in self.providers
         ]
-        
+
         results = await asyncio.gather(*tasks, return_exceptions=True)
-        
+
         # Filter out exceptions and None results
         metadata_list = []
         for i, result in enumerate(results):
@@ -126,7 +125,7 @@ class MetadataAggregator:
                 logger.error(f"Provider {self.providers[i].source.value} failed: {result}")
             elif result is not None:
                 metadata_list.append(result)
-        
+
         if not metadata_list:
             logger.warning(f"No metadata found for {artist} - {title}")
             return None
@@ -172,15 +171,15 @@ class MetadataAggregator:
         metadata_list: list[TrackMetadata],
         artist: str,
         title: str
-    ) -> Optional[TrackMetadata]:
+    ) -> TrackMetadata | None:
         """
         Merge metadata from multiple sources using confidence-weighted consensus.
-        
+
         Args:
             metadata_list: List of TrackMetadata from different providers
             artist: Artist name for result
             title: Track title for result
-            
+
         Returns:
             Merged TrackMetadata with consensus values
         """
@@ -202,7 +201,7 @@ class MetadataAggregator:
             if total_weight > 0:
                 weighted_bpm = sum(bpm * conf for bpm, conf in bpm_values) / total_weight
                 merged.bpm = round(weighted_bpm, 1)
-                
+
                 # Confidence is higher when sources agree
                 bpm_stdev = self._compute_stdev([bpm for bpm, _ in bpm_values])
                 if bpm_stdev < 1.0:

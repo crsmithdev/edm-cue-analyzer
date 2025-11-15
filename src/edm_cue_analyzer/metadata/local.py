@@ -1,8 +1,8 @@
 """Local file metadata providers."""
 
+import contextlib
 import logging
 from pathlib import Path
-from typing import Optional
 
 import soundfile as sf
 
@@ -28,17 +28,17 @@ class LocalFileProvider(MetadataProvider):
 
     async def get_metadata(
         self,
-        artist: Optional[str] = None,
-        title: Optional[str] = None,
-        file_path: Optional[Path] = None,
+        artist: str | None = None,
+        title: str | None = None,
+        file_path: Path | None = None,
         **kwargs
-    ) -> Optional[TrackMetadata]:
+    ) -> TrackMetadata | None:
         """
         Read metadata from local file tags.
-        
+
         Args:
             file_path: Path to audio file (required)
-            
+
         Returns:
             TrackMetadata with file tag information
         """
@@ -71,14 +71,12 @@ class LocalFileProvider(MetadataProvider):
                     metadata.title = self._get_tag(audio, ['title', 'TITLE', 'TIT2'])
                     metadata.album = self._get_tag(audio, ['album', 'ALBUM', 'TALB'])
                     metadata.genre = self._get_tag(audio, ['genre', 'GENRE', 'TCON'])
-                    
+
                     # Try to get BPM from tags
                     bpm_str = self._get_tag(audio, ['bpm', 'BPM', 'TBPM'])
                     if bpm_str:
-                        try:
+                        with contextlib.suppress(ValueError, TypeError):
                             metadata.bpm = float(bpm_str)
-                        except (ValueError, TypeError):
-                            pass
 
             except Exception as e:
                 logger.debug(f"Could not read tags from {file_path}: {e}")
@@ -91,7 +89,7 @@ class LocalFileProvider(MetadataProvider):
 
         return metadata
 
-    def _get_tag(self, audio, tag_names: list[str]) -> Optional[str]:
+    def _get_tag(self, audio, tag_names: list[str]) -> str | None:
         """Try multiple tag names and return first found."""
         for tag_name in tag_names:
             if tag_name in audio:
@@ -105,18 +103,18 @@ class LocalFileProvider(MetadataProvider):
     def _parse_filename(self, file_path: Path) -> dict:
         """
         Parse artist/title from filename.
-        
+
         Handles formats like:
         - "Artist - Title.flac"
         - "01. Artist - Title.mp3"
         - "Artist_-_Title.wav"
         """
         name = file_path.stem
-        
+
         # Remove track numbers
         import re
         name = re.sub(r'^\d+[\.\s]*', '', name)
-        
+
         # Try common separators
         for sep in [' - ', ' – ', ' — ', '_-_', '-']:
             if sep in name:
@@ -125,6 +123,6 @@ class LocalFileProvider(MetadataProvider):
                     'artist': parts[0].strip(),
                     'title': parts[1].strip()
                 }
-        
+
         # No separator found, use whole name as title
         return {'title': name.strip()}
