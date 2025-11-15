@@ -254,6 +254,8 @@ class MetadataAggregator:
         """Async context manager entry."""
         return self
 
-    async def __aexit__(self, exc_type, exc_val, exc_tb):
+    async def __aexit__(self, _exc_type, _exc_val, _exc_tb):
         """Async context manager exit."""
+        # Parameters provided by the context manager protocol are intentionally
+        # unused here; prefix them with '_' to make that explicit.
         await self.close()

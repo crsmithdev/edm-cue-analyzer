@@ -2,7 +2,6 @@
 
 import asyncio
 import logging
-from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor
 from dataclasses import dataclass
 from typing import Any
 
@@ -156,7 +155,10 @@ class ConsensusBpmDetector:
         """
         # Run async version in event loop
         try:
-            loop = asyncio.get_running_loop()
+            # If there's a running loop this will succeed and we instruct the
+            # caller to use the async API. We don't need to keep the returned
+            # loop object, so avoid assigning to an unused variable.
+            asyncio.get_running_loop()
             # We're already in an async context, use the async version directly
             raise RuntimeError("Use detect_async() when in async context")
         except RuntimeError:
@@ -174,15 +176,15 @@ class ConsensusBpmDetector:
             beats_pos,
             confidence,
             bpm,
-            estimates_list,
-            intervals,
+            _estimates_list,
+            _intervals,
             first_peak_bpm,
-            first_peak_spread,
+            _first_peak_spread,
             first_peak_weight,
             second_peak_bpm,
-            second_peak_spread,
+            _second_peak_spread,
             second_peak_weight,
-            histogram,
+            _histogram,
         ) = rhythm_desc(y)
 
         import librosa
