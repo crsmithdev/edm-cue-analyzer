@@ -496,31 +496,3 @@ class ConsensusBpmDetector:
             return corrected_estimates
 
         return estimates
-
-
-class ConsensusAnalyzer:
-    """
-    Framework for consensus-based analysis across multiple methods.
-
-    Can be extended for other types of analysis (drop detection, key detection, etc.)
-    """
-
-    @staticmethod
-    def weighted_median(values: np.ndarray, weights: np.ndarray) -> float:
-        """Calculate weighted median of values."""
-        sorted_indices = np.argsort(values)
-        sorted_values = values[sorted_indices]
-        sorted_weights = weights[sorted_indices]
-
-        cumsum = np.cumsum(sorted_weights / np.sum(sorted_weights))
-        median_idx = np.searchsorted(cumsum, 0.5)
-
-        return float(sorted_values[median_idx])
-
-    @staticmethod
-    def calculate_agreement(
-        values: np.ndarray, consensus_value: float, tolerance: float
-    ) -> float:
-        """Calculate agreement ratio (0-1) of values with consensus."""
-        agreement_count = np.sum(np.abs(values - consensus_value) < tolerance)
-        return agreement_count / len(values)

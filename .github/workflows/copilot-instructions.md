@@ -14,14 +14,14 @@ Early-stage DJ software for EDM track preparation. Current feature: automated cu
 - Skip phrases like "Let me help you with that" - just do it
 - Treat me as peer collaborator, not customer
 - Challenge problematic decisions, but defer if I insist
-- Remember context from earlier conversation
-- Do not create summary documents unless asked to
+- Remember context from earlier conversations
+
 
 ### Asking Questions vs. Taking Action
-- Ask when requirements unclear, conflicting, or have significant trade-offs
+- Ask when requirements are unclear, conflicting, or have significant trade-offs
 - For multiple approaches: briefly present options, recommend one, proceed
 - Don't ask permission for obvious next steps
-- Batch related questions together
+- Batch related questions together 
 
 ### Uncertainty & Confidence
 - Be direct about what you know vs. don't know - say "I don't know" instead of hedging
@@ -45,6 +45,7 @@ Early-stage DJ software for EDM track preparation. Current feature: automated cu
 - Point out issues, improvements, or technical debt even when not asked
 - Do not create summary documents unless I ask you to
 - If something will take time, say so upfront
+- Do not create summary documents unless asked to
 - This project is in early development, do not worry about legacy or backwards-compatibility
 
 ## Source Control

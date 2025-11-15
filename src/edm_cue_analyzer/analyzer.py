@@ -428,17 +428,8 @@ class AudioAnalyzer:
         # Create lookup by name
         self.extractors_by_name = {ext.name: ext for ext in self.feature_extractors}
 
-    def add_feature_extractor(self, extractor: FeatureExtractor):
-        """Add a new feature extractor plugin."""
-        self.feature_extractors.append(extractor)
-        self.extractors_by_name[extractor.name] = extractor
-
-    def remove_feature_extractor(self, name: str):
-        """Remove a feature extractor by name."""
-        if name in self.extractors_by_name:
-            extractor = self.extractors_by_name[name]
-            self.feature_extractors.remove(extractor)
-            del self.extractors_by_name[name]
+    # Feature extractor list is managed internally; public add/remove helpers
+    # were removed to minimize the public surface used by the CLI.
 
     @timed("BPM detection")
     async def analyze_with(
@@ -589,14 +580,7 @@ class AudioAnalyzer:
             features=context.get("features", {}),
         )
 
-    @timed("Total track analysis")
-    async def analyze_file(self, audio_path: Path) -> TrackStructure:
-        """Analyze an audio file with full analysis.
-        
-        This is the main entry point for backward compatibility.
-        Runs all available analyses.
-        """
-        return await self.analyze_with(audio_path, analyses=["full"])
+    # Backwards-compatible analyze_file helper removed; use analyze_with()
 
 def bars_to_seconds(bars: int, bpm: float) -> float:
     """
@@ -624,22 +608,4 @@ def seconds_to_bars(seconds: float, bpm: float) -> int:
         Number of 4/4 bars (rounded down)
     """
     return int((seconds * bpm) / (4 * 60.0))
-
-
-def calculate_energy_stats(energy: np.ndarray) -> dict[str, float]:
-    """
-    Calculate statistical measures of energy curve.
-
-    Args:
-        energy: Energy curve array
-
-    Returns:
-        Dictionary with mean, std, max, min, and median energy
-    """
-    return {
-        "mean": float(np.mean(energy)),
-        "std": float(np.std(energy)),
-        "max": float(np.max(energy)),
-        "min": float(np.min(energy)),
-        "median": float(np.median(energy)),
-    }
+# Helper energy utilities removed: use numpy directly where needed.
