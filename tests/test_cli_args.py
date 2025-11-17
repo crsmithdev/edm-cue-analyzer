@@ -16,7 +16,6 @@ def test_add_common_args_parses_options():
             "dummy.mp3",
             "-o",
             "out.xml",
-            "--bpm-only",
             "-a",
             "bpm",
             "-j",
@@ -30,7 +29,6 @@ def test_add_common_args_parses_options():
 
     assert args.input == ["dummy.mp3"]
     assert args.output.name == "out.xml"
-    assert args.bpm_only is True
     assert args.analyses == ["bpm"]
     assert args.jobs == 2
     assert args.bpm_precision == 1

@@ -444,7 +444,7 @@ class AudioAnalyzer:
         Args:
             audio_path: Path to audio file
             analyses: Set of analysis names ('bpm', 'energy', 'drops', 'breakdowns', 'builds'),
-                     or preset name ('bpm-only', 'structure', 'full')
+                     or preset name ('bpm', 'structure', 'full')
 
         Returns:
             TrackStructure with requested analyses populated

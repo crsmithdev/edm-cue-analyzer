@@ -145,7 +145,7 @@ BPM VALIDATION REPORT
 1. **Find Files**: Scans directory for audio files (.flac, .mp3, .wav, .m4a, .aac, .ogg)
 2. **Parse Filenames**: Extracts artist and title from filename
 3. **Lookup Reference**: Queries online databases for known BPM (with caching)
-4. **Analyze Audio**: Runs BPM-only analysis using the EDM Cue Analyzer
+4. **Analyze Audio**: Runs BPM analysis using the EDM Cue Analyzer (use `-a bpm`)
 5. **Compare Results**: Calculates error and detects octave errors (half/double time)
 6. **Generate Report**: Produces comprehensive statistics and error analysis
 

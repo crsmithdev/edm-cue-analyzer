@@ -26,11 +26,30 @@ def _add_common_args(parser: argparse.ArgumentParser) -> None:
     """
     parser.add_argument("input", nargs="+", help="Input audio files")
     parser.add_argument("-o", "--output", type=Path, help="Output XML file")
-    parser.add_argument("--bpm-only", action="store_true", dest="bpm_only", help="Only detect BPM")
     parser.add_argument("-a", "--analyses", action="append", help="Analyses to run (can be repeated)")
     parser.add_argument("-j", "--jobs", type=int, default=1, help="Number of concurrent jobs")
     parser.add_argument("--bpm-precision", type=int, default=1, help="Decimal precision for BPM output")
     parser.add_argument("--log-file", type=Path, dest="log_file", help="Optional log file path")
+
+
+def _add_full_args(parser: argparse.ArgumentParser) -> None:
+    """Add the full set of CLI arguments to a parser (used for subcommands).
+
+    This composes the common args used by tests with the additional flags
+    used by the main CLI.
+    """
+    # Common arguments (kept small for tests)
+    _add_common_args(parser)
+
+    # Additional runtime/configuration flags
+    parser.add_argument("-c", "--config", type=Path, help="Custom configuration YAML file")
+    parser.add_argument(
+        "--no-display",
+        action="store_true",
+        help="Disable terminal display of results",
+    )
+    parser.add_argument("--verbose", action="store_true", help="Enable verbose debug logging")
+    parser.add_argument("-v", "--version", action="version", version="EDM Cue Analyzer 1.0.0")
 
 
 def _format_time(seconds: float) -> str:
@@ -116,8 +135,8 @@ async def analyze_track(
         config: Configuration object
         output_xml: Optional path for XML output
         display: Whether to display results in terminal
-        bpm_only: Only detect and display BPM (deprecated, use analyses='bpm-only')
-        analyses: Analyses to run ('bpm-only', 'structure', 'full') or set of names
+    bpm_only: Only detect and display BPM (deprecated, use analyses='bpm')
+    analyses: Analyses to run ('bpm', 'structure', 'full') or set of names
         log_file: Optional path to append log output to
         verbose: Enable verbose output
         track_num: Current track number (for progress display in batch mode)
@@ -140,8 +159,8 @@ async def analyze_track(
 
         # Determine which analyses to run
         if bpm_only:
-            # Backward compatibility: --bpm-only flag
-            requested_analyses = "bpm-only"
+            # Backward compatibility: old flag mapped to analyses preset 'bpm'
+            requested_analyses = "bpm"
         elif analyses:
             # Use new analyses parameter
             # If a single analysis was passed as a list, use the single item; otherwise use a set
@@ -153,10 +172,8 @@ async def analyze_track(
         # Run analyses
         structure = await analyzer.analyze_with(filepath, analyses=requested_analyses)
 
-        # Check if we're doing minimal output (bpm-only)
-        if requested_analyses == "bpm-only" or (
-            isinstance(requested_analyses, str) and requested_analyses == "bpm"
-        ):
+        # Check if we're doing minimal output (bpm)
+        if (isinstance(requested_analyses, str) and requested_analyses == "bpm"):
             elapsed = time.perf_counter() - start_time
             # Output to stdout
             effective_bpm = structure.reference_bpm if structure.reference_bpm is not None else structure.detected_bpm
@@ -224,7 +241,7 @@ async def batch_analyze(
         config: Configuration object
         output_xml: Optional path for XML output (only for single file)
         display: Whether to display results in terminal
-        bpm_only: Only detect BPM (deprecated, use analyses='bpm-only')
+    bpm_only: Only detect BPM (deprecated, use analyses='bpm')
         analyses: List of analyses to run
         log_file: Optional log file path
         verbose: Enable verbose output
@@ -329,80 +346,51 @@ def main():
         epilog="""
 Examples:
   # Analyze a track with default config
-  edm-cue-analyzer track.mp3
+  edm-cue-analyzer analyze track.mp3
 
   # Analyze multiple files
-  edm-cue-analyzer track1.flac track2.flac track3.flac
+  edm-cue-analyzer analyze track1.flac track2.flac track3.flac
+
+  # Cue (runs analysis then places cues stub)
+  edm-cue-analyzer cue track.flac
 
   # Analyze with glob pattern
-  edm-cue-analyzer "/music/*.flac"
+  edm-cue-analyzer analyze "/music/*.flac"
 
   # Analyze and export to Rekordbox XML (single file only)
-  edm-cue-analyzer track.flac -o track_cues.xml
+  edm-cue-analyzer analyze track.flac -o track_cues.xml
 
   # Use custom configuration
-  edm-cue-analyzer track.mp3 -c my_config.yaml
+  edm-cue-analyzer analyze track.mp3 -c my_config.yaml
 
   # Quiet mode (compact progress)
-  edm-cue-analyzer *.flac
+  edm-cue-analyzer analyze *.flac
 
   # Verbose mode (detailed per-file output)
-  edm-cue-analyzer *.flac --verbose
+  edm-cue-analyzer analyze *.flac --verbose
         """,
     )
 
-    parser.add_argument(
-        "input",
-        type=str,
-        nargs="+",
-        help="Audio file(s) to analyze (.mp3, .flac, .wav, etc.) or glob pattern",
+    # Top-level parser still accepts the same flags for backward-compatibility
+    _add_full_args(parser)
+
+    subparsers = parser.add_subparsers(dest="command", help="Sub-commands")
+
+    # Analyze subcommand
+    analyze_parser = subparsers.add_parser(
+        "analyze",
+        help="Run analysis on one or more tracks",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
     )
+    _add_full_args(analyze_parser)
 
-    parser.add_argument("-o", "--output", type=Path, help="Output Rekordbox XML file path")
-
-    parser.add_argument("-c", "--config", type=Path, help="Custom configuration YAML file")
-
-    parser.add_argument(
-        "--no-display", action="store_true", help="Disable terminal display of results"
+    # Cue subcommand: runs analysis then places cues (stub)
+    cue_parser = subparsers.add_parser(
+        "cue",
+        help="Run analysis and place cues (stub)",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
     )
-
-    parser.add_argument(
-        "--bpm-only", action="store_true", help="Only detect and display BPM (skip full analysis)"
-    )
-
-    parser.add_argument(
-        "-a",
-        "--analyses",
-        type=str,
-        nargs="+",
-        help="Analyses to run: bpm, energy, drops, breakdowns, builds, or presets: bpm-only, structure, full (default: full)",
-    )
-
-    parser.add_argument(
-        "-j",
-        "--jobs",
-        type=int,
-        default=4,
-        help="Number of files to process concurrently (default: 4, use 1 for sequential)",
-    )
-
-    parser.add_argument("--verbose", action="store_true", help="Enable verbose debug logging")
-
-    parser.add_argument(
-        "--bpm-precision",
-        type=int,
-        choices=[0, 1, 2],
-        default=None,
-        help="BPM decimal precision (0=integer, 1=one decimal [default], 2=two decimals)",
-    )
-
-    parser.add_argument(
-        "--log-file",
-        type=Path,
-        help="Append all output (stdout and logs) to specified file",
-    )
-
-    parser.add_argument("-v", "--version", action="version", version="EDM Cue Analyzer 1.0.0")
+    _add_full_args(cue_parser)
 
     args = parser.parse_args()
 
@@ -476,19 +464,29 @@ Examples:
         config.bpm_precision = args.bpm_precision
 
     # Analyze tracks
-    return asyncio.run(
-        batch_analyze(
-            files,
-            config,
-            output_xml=args.output,
-            display=not args.no_display,
-            bpm_only=args.bpm_only,
-            analyses=args.analyses,
-            log_file=args.log_file,
-            verbose=args.verbose,
-            max_concurrent=args.jobs,
+    # If user selected 'cue' subcommand, run analysis then a stub to place cues
+    def _run_analysis():
+        return asyncio.run(
+            batch_analyze(
+                files,
+                config,
+                output_xml=getattr(args, "output", None),
+                display=not getattr(args, "no_display", False),
+                bpm_only=getattr(args, "bpm_only", False),
+                analyses=getattr(args, "analyses", None),
+                log_file=getattr(args, "log_file", None),
+                verbose=getattr(args, "verbose", False),
+                max_concurrent=getattr(args, "jobs", 1),
+            )
         )
-    )
+
+    rc = _run_analysis()
+
+    if args.command == "cue":
+        # Dummy placement step — in future this would interact with a DJ system
+        logger.info("Place cues stub: would place cues for %d file(s)", len(files))
+
+    return rc
 
 
 if __name__ == "__main__":

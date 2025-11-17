@@ -57,7 +57,7 @@ ANALYSES = {
 
 # Preset combinations for common use cases
 ANALYSIS_PRESETS = {
-    "bpm-only": {"bpm"},
+    "bpm": {"bpm"},
     "structure": {"bpm", "energy", "drops", "breakdowns", "builds"},
     "full": set(ANALYSES.keys()),
 }

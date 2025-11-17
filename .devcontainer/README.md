@@ -36,7 +36,7 @@ This project uses VS Code Dev Containers to provide a consistent Linux developme
 
 ```bash
 # Inside the container terminal
-edm-cue-analyzer tests/your-track.flac --bpm-only
+edm-cue-analyzer analyze tests/your-track.flac -a bpm
 ```
 
 ### Running Tests
@@ -99,7 +99,7 @@ Once in the container, try:
 
 ```bash
 # Test essentia is working
-edm-cue-analyzer tests/your-track.flac --bpm-only --verbose
+edm-cue-analyzer analyze tests/your-track.flac -a bpm --verbose
 
 # Run all tests
 pytest -v
