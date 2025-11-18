@@ -63,13 +63,13 @@ async def analyze_drops(context: dict) -> list[float]:
     
     # If we have Spotify energy metadata, use it to calibrate the threshold
     # Higher energy tracks (more intense) should use higher thresholds
-    base_threshold = 1.3  # Default: 23% energy decrease
+    base_threshold = 1.5  # Default: 33% energy decrease
     
     if metadata and hasattr(metadata, 'energy') and metadata.energy is not None:
         # Spotify energy is 0.0 to 1.0
-        # Scale threshold: low energy (0.3) -> 1.2, high energy (0.9) -> 1.5
+        # Scale threshold: low energy (0.3) -> 1.4, high energy (0.9) -> 1.7
         spotify_energy = metadata.energy
-        base_threshold = 1.2 + (spotify_energy * 0.5)
+        base_threshold = 1.4 + (spotify_energy * 0.5)
         logger.debug(
             "Using Spotify energy %.2f to set drop threshold: %.2f (%.0f%% decrease)",
             spotify_energy, base_threshold, (1 - 1/base_threshold) * 100
