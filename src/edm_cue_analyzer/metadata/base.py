@@ -34,6 +34,7 @@ class TrackMetadata:
     key: str | None = None
     duration: float | None = None  # seconds
     sample_rate: int | None = None
+    energy: float | None = None  # Spotify energy (0.0 to 1.0)
 
     # Genre/style
     genre: str | None = None

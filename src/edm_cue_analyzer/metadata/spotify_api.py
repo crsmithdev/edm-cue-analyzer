@@ -75,6 +75,7 @@ class SpotifyAPIProvider(MetadataProvider):
             duration_ms = features.get("duration_ms")
             key = features.get("key")
             mode = features.get("mode")
+            energy = features.get("energy")  # 0.0 to 1.0
 
             meta = TrackMetadata(
                 artist=artist,
@@ -83,6 +84,7 @@ class SpotifyAPIProvider(MetadataProvider):
                 key=int(key) if key is not None else None,
                 genre=None,
                 duration=(duration_ms / 1000.0) if duration_ms else None,
+                energy=float(energy) if energy is not None else None,
                 source=self.source,
                 confidence=0.85,
             )
