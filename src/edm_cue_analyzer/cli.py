@@ -18,13 +18,14 @@ from .rekordbox import export_to_rekordbox
 logger = logging.getLogger(__name__)
 
 
-def _add_common_args(parser: argparse.ArgumentParser) -> None:
+def _add_common_args(parser: argparse.ArgumentParser, include_input: bool = True) -> None:
     """Add common CLI arguments used by main and tests.
 
     This helper registers only the arguments required by the test-suite and
     typical CLI entrypoints. Keep changes minimal and conservative.
     """
-    parser.add_argument("input", nargs="+", help="Input audio files")
+    if include_input:
+        parser.add_argument("input", nargs="+", help="Input audio files")
     parser.add_argument("-o", "--output", type=Path, help="Output XML file")
     parser.add_argument("-a", "--analyses", action="append", help="Analyses to run (can be repeated)")
     parser.add_argument("-j", "--jobs", type=int, default=1, help="Number of concurrent jobs")
@@ -32,14 +33,15 @@ def _add_common_args(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--log-file", type=Path, dest="log_file", help="Optional log file path")
 
 
-def _add_full_args(parser: argparse.ArgumentParser) -> None:
+def _add_full_args(parser: argparse.ArgumentParser, include_input: bool = False) -> None:
     """Add the full set of CLI arguments to a parser (used for subcommands).
 
     This composes the common args used by tests with the additional flags
     used by the main CLI.
     """
-    # Common arguments (kept small for tests)
-    _add_common_args(parser)
+    # Common arguments (kept small for tests). By default top-level parsers
+    # should not include the positional `input` argument; subcommands add it.
+    _add_common_args(parser, include_input=include_input)
 
     # Additional runtime/configuration flags
     parser.add_argument("-c", "--config", type=Path, help="Custom configuration YAML file")
@@ -383,6 +385,8 @@ Examples:
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     _add_full_args(analyze_parser)
+    # Positional input for the subcommand (one or more files/globs)
+    analyze_parser.add_argument("input", nargs="+", help="Input audio files")
 
     # Cue subcommand: runs analysis then places cues (stub)
     cue_parser = subparsers.add_parser(
@@ -391,6 +395,8 @@ Examples:
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     _add_full_args(cue_parser)
+    # Positional input for the cue subcommand
+    cue_parser.add_argument("input", nargs="+", help="Input audio files")
 
     args = parser.parse_args()
 

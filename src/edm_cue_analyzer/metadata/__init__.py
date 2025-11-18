@@ -8,6 +8,8 @@ from .online import (
     GetSongBPMProvider,
     TunebatProvider,
 )
+from .spotify_api import SpotifyAPIProvider
+from .spotify import parse_spotify_url, track_to_metadata
 
 __all__ = [
     "MetadataProvider",
@@ -17,5 +19,8 @@ __all__ = [
     "GetSongBPMProvider",
     "TunebatProvider",
     "BeatportProvider",
+    "SpotifyAPIProvider",
+    "parse_spotify_url",
+    "track_to_metadata",
     "MetadataAggregator",
 ]

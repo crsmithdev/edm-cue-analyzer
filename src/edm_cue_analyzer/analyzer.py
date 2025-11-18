@@ -520,15 +520,109 @@ class AudioAnalyzer:
             # If local metadata provider or mutagen isn't available, continue silently
             logger.debug("Local metadata provider not used: %s", e)
 
+        # If we don't have BPM from local tags, try online metadata providers.
+        # Use MetadataAggregator which queries multiple online providers.
+        online_meta = None
+        try:
+            if not context.get("local_metadata") or getattr(context.get("local_metadata"), "bpm", None) is None:
+                # Try to determine artist/title from local metadata or filename
+                artist = None
+                title = None
+                try:
+                    if context.get("local_metadata"):
+                        artist = context["local_metadata"].artist
+                        title = context["local_metadata"].title
+                except Exception:
+                    artist = None
+                    title = None
+
+                if not artist or not title:
+                    # Simple filename parsing as fallback (same heuristics as LocalFileProvider)
+                    name = audio_path.stem
+                    import re
+
+                    name = re.sub(r'^\d+[\.\s]*', '', name)
+                    for sep in [" - ", " – ", " — ", "_-_", "-"]:
+                        if sep in name:
+                            parts = name.split(sep, 1)
+                            artist = artist or parts[0].strip()
+                            title = title or parts[1].strip()
+                            break
+
+                if artist and title:
+                    from .metadata import MetadataAggregator
+
+                    agg = MetadataAggregator()
+                    try:
+                        online_meta = await agg.get_metadata(artist=artist, title=title)
+                    except Exception as e:
+                        logger.debug("Online metadata aggregator failed: %s", e)
+
+                if online_meta is not None:
+                    context["online_metadata"] = online_meta
+                    if getattr(online_meta, "bpm", None) is not None:
+                        logger.info(
+                            "Found BPM from online metadata: %.2f BPM (will be available as reference)",
+                            float(online_meta.bpm),
+                        )
+        except Exception as e:
+            logger.debug("Online metadata lookup skipped: %s", e)
+
+        # Extract features needed by analyses
+        # Run all registered feature extractors and merge their outputs
+        for extractor in self.feature_extractors:
+            try:
+                extracted = await asyncio.to_thread(
+                    extractor.extract, y, sr, energy_window=self.config.energy_window_seconds
+                )
+                context["features"].update(extracted)
+                logger.debug(f"Extracted features from {extractor.name}: {list(extracted.keys())}")
+            except Exception as e:
+                logger.warning(f"Feature extractor {extractor.name} failed: {e}")
+
         # Run analyses in dependency order
         results = {}
         for analysis_name in execution_order:
             analysis = ANALYSES[analysis_name]
             logger.debug(f"Running analysis: {analysis_name}")
 
+            # Optionally skip BPM analysis if metadata already provided a BPM
             start = time.perf_counter()
             try:
-                result = await analysis.func(context)
+                if analysis_name == "bpm":
+                    meta_bpm = None
+                    if context.get("local_metadata") and getattr(context.get("local_metadata"), "bpm", None) is not None:
+                        try:
+                            meta_bpm = float(context.get("local_metadata").bpm)
+                        except Exception:
+                            meta_bpm = None
+                    elif context.get("online_metadata") and getattr(context.get("online_metadata"), "bpm", None) is not None:
+                        try:
+                            meta_bpm = float(context.get("online_metadata").bpm)
+                        except Exception:
+                            meta_bpm = None
+
+                    if meta_bpm is not None:
+                        # Build lightweight estimate object expected by downstream code
+                        bpm_estimate = type("BpmEstimate", (), {})()
+                        bpm_estimate.bpm = round(meta_bpm, 1) if (meta_bpm and self.full_config) else meta_bpm
+                        bpm_estimate.beats = None
+                        # Derive a reasonable bar_duration for downstream consumers
+                        # A bar (4/4) duration in seconds = (4 * 60) / bpm
+                        try:
+                            bpm_estimate.bar_duration = (4.0 * 60.0) / float(meta_bpm)
+                        except Exception:
+                            bpm_estimate.bar_duration = 0.0
+                        bpm_estimate.confidence = getattr(context.get("online_metadata") or context.get("local_metadata"), "confidence", 0.9)
+                        bpm_estimate.metadata = {"num_methods": 1}
+
+                        context["bpm_skipped_due_to_metadata"] = True
+                        result = bpm_estimate
+                    else:
+                        result = await analysis.func(context)
+                else:
+                    result = await analysis.func(context)
+
                 elapsed = time.perf_counter() - start
                 logger.info(f"{analysis.description}: {elapsed:.2f}s")
 

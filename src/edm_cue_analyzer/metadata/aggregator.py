@@ -7,6 +7,7 @@ from pathlib import Path
 
 from .base import MetadataProvider, MetadataSource, TrackMetadata
 from .online import BeatportProvider, GetSongBPMProvider, TunebatProvider
+from .spotify_api import SpotifyAPIProvider
 
 logger = logging.getLogger(__name__)
 
@@ -37,6 +38,7 @@ class MetadataAggregator:
             enable_cache: Whether to use caching
         """
         self.providers = providers or [
+            SpotifyAPIProvider(),
             GetSongBPMProvider(),
             TunebatProvider(),
             BeatportProvider(),

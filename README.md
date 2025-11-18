@@ -75,6 +75,44 @@ edm-cue-analyzer track.flac -o cues.xml
 edm-cue-analyzer track.mp3 -c custom_config.yaml
 ```
 
+## CLI: Subcommands & Flags
+
+The CLI exposes two main subcommands and a set of common flags. Note: due to how the parser is wired, the command accepts the input files as a positional argument at the top-level and again on the subcommand; the recommended invocation is shown below.
+
+- Subcommands:
+  - analyze — Run analysis on one or more tracks and display cue points or BPM information.
+  - cue — Run analysis and place cues (currently a stub that demonstrates the cue-placement step).
+
+- Common positional:
+  - input — One or more input audio files or glob patterns. Example: `"/music/*.flac"`.
+
+- Key flags (available on both top-level and subcommands):
+  - -o, --output PATH: Export Rekordbox XML for a single file (e.g. `-o track_cues.xml`).
+  - -a, --analyses ANALYSES: Analyses to run; can be repeated. Example: `-a bpm -a energy` or `-a bpm`.
+  - -j, --jobs N: Number of concurrent jobs (default: 1).
+  - --bpm-precision N: Decimal precision for BPM output (default: 1).
+  - --log-file PATH: Append logs to a file in addition to the console.
+  - -c, --config PATH: Path to custom YAML configuration file.
+  - --no-display: Disable the terminal display (useful when only exporting XML).
+  - --verbose: Enable verbose debug logging (more detailed INFO/DEBUG output).
+  - -v, --version: Print the tool version and exit.
+
+Examples:
+
+```bash
+# Recommended: subcommand then files (typical usage)
+edm-cue-analyzer analyze track.mp3 -a bpm --verbose
+
+# If you encounter parsing errors in some shells, use the positional input before the subcommand
+# (the parser also registers `input` at the top level):
+edm-cue-analyzer "track.mp3" analyze -a bpm --verbose
+
+# Analyze multiple files with globbing and export to Rekordbox XML
+edm-cue-analyzer analyze "/music/*.flac" -o /tmp/cues.xml
+```
+
+Tip: use `--verbose` to see detailed logs from the analyzer and metadata providers (useful to confirm online lookups such as Spotify).
+
 ### Python Library
 
 ```python

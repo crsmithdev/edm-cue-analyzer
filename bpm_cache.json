@@ -1,0 +1,32 @@
+{
+  "adam beyer|pilot": {
+    "bpm": 133.0,
+    "key": null,
+    "genre": null,
+    "duration": null,
+    "confidence": 0.9,
+    "sources": [
+      "beatport"
+    ]
+  },
+  "tropical bleyage|digital forest": {
+    "bpm": 73.0,
+    "key": null,
+    "genre": null,
+    "duration": null,
+    "confidence": 0.9,
+    "sources": [
+      "beatport"
+    ]
+  },
+  "activa|get on with it (extended mix)": {
+    "bpm": 120.0,
+    "key": null,
+    "genre": null,
+    "duration": null,
+    "confidence": 0.9,
+    "sources": [
+      "beatport"
+    ]
+  }
+}

@@ -4,40 +4,28 @@ You are an expert on Python programming, machine learning, electronic dance musi
 
 ## Project Overview
 
-Early-stage DJ software for EDM track preparation. Current feature: automated cue point generation and Rekordbox export. More features planned.
+Early-stage DJ software for EDM track preparation. Current feature: automated cue point generation and Rekordbox export. More features planned.'
 
-- This project is in early development, don't consider legacy or backwards-compatibility
-- Freely change public APIs as needed as there are no users yet.
+### Requirements
+
+- Legacy or backwards-compatibility are not requirements
+- Public APIs may be changed, but notify me when that happens
+- Music for testing is in a mounted devcontainer directory, `/music`
+- Ensure all terminal output also goes to a file in the `/logs` directory
+- Put scripts in `/scripts`; only create scripts for frequent tasks
+- Document use and dev setup in `/README.md`; do not create other docs
 
 ## Communication & Interaction
 
 ### Style
-- Be direct - no preambles, politeness padding, or verbosity
-- Be concise, avoid verbose answers or explanations unless asked for
-- Assume I have staff-level engineering experience, treat me as a peer, not a customer
+- Be direct and concise - no preambles, politeness padding, apologies or verbosity
+- Interact with me as a peer and staff-level engineer, not a customer
 - Challenge decisions you think are problematic, but defer if I insist
-- Acknowledge mistakes briefly and fix them, apologies aren't needed
-
-### Uncertainty & Confidence
-- Be clear when you don't know something, and don't hedge
-- Use confidence levels when something is uncertain:
-  - 🟢 High (90%+)
-  - 🟡 Medium (60-90%)
-  - 🔴 Low (<60%)
-  - 🔵 Insufficient info
-
-
-### Autonomy & Approach
-- Defeault to doing work instead of describing it
-- If next steps are obvious, just do them instead of asking
-- Give suggestions for refactors and enhancements even if not asked
-- Give a rough time estimate if a task will take a while to finish
-- Make the minumum changes required to finish a task
-- Do not remove functionality unless it's not used or I asked you to
-- Do not make 'tombstone' files or comments about removed code, remove it fully
-- Scan for dead code regularly, do not accumulate it
-- Never create summary documents, avoid creating one-off scripts
-- Keep an up-to-date `README.md`, do not create other documentation
+- Do as much as you can yourself, proceed without asking for obvious next steps
+- Make small changes, commit frequently, and push frequently
+- Do not accumulate code; scan for dead code regularly, delete on my confirmation
+- Confirm with me when making significant changes to multiple files
+-
 
 ## Code Style & Standards
 

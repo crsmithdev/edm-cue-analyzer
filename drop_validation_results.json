@@ -1,0 +1,89 @@
+{
+  "test_name": "Change 7: Energy Derivative Analysis",
+  "tracks_tested": 10,
+  "total_drops": 15,
+  "results": [
+    {
+      "file": "3LAU, Dnmo - Falling.flac",
+      "drops": [
+        29.55
+      ],
+      "num_drops": 1,
+      "success": true
+    },
+    {
+      "file": "AUTOFLOWER - Dimension.flac",
+      "drops": [
+        18.01,
+        128.67
+      ],
+      "num_drops": 2,
+      "success": true
+    },
+    {
+      "file": "AUTOFLOWER - THE ONLY ONE.flac",
+      "drops": [
+        20.72
+      ],
+      "num_drops": 1,
+      "success": true
+    },
+    {
+      "file": "AUTOFLOWER - Wallflower.flac",
+      "drops": [
+        16.52,
+        62.01
+      ],
+      "num_drops": 2,
+      "success": true
+    },
+    {
+      "file": "AUTOFLOWER - When It's Over (Extended Mix).flac",
+      "drops": [],
+      "num_drops": 0,
+      "success": true
+    },
+    {
+      "file": "Activa - Get On With It (Extended Mix).flac",
+      "drops": [],
+      "num_drops": 0,
+      "success": true
+    },
+    {
+      "file": "Adam Beyer - Pilot.flac",
+      "drops": [],
+      "num_drops": 0,
+      "success": true
+    },
+    {
+      "file": "Adana Twins - Maya.flac",
+      "drops": [
+        16.96,
+        61.68,
+        167.79,
+        202.97,
+        259.24
+      ],
+      "num_drops": 5,
+      "success": true
+    },
+    {
+      "file": "Agents Of Time - Zodiac.flac",
+      "drops": [
+        20.48
+      ],
+      "num_drops": 1,
+      "success": true
+    },
+    {
+      "file": "Artbat - Artefact.flac",
+      "drops": [
+        30.95,
+        95.96,
+        218.46
+      ],
+      "num_drops": 3,
+      "success": true
+    }
+  ]
+}

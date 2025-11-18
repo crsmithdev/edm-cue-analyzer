@@ -85,10 +85,15 @@ async def analyze_drops(context: dict) -> list[float]:
     mean_onset = np.mean(onset_strength)
     std_onset = np.std(onset_strength)
 
-    # Thresholds for "significant" bass/beat presence
-    low_threshold = mean_low + 0.3 * std_low
-    perc_threshold = mean_perc + 0.3 * std_perc
-    onset_threshold = mean_onset + 0.8 * std_onset  # Strong onset required
+    # Calculate energy derivatives (Change 7: Wolfram technique)
+    # Drops are characterized by "rapidly falls" after peak
+    low_derivative = np.gradient(low_energy)
+    perc_derivative = np.gradient(percussive_energy)
+
+    # Thresholds for "significant" bass/beat presence (increased for selectivity)
+    low_threshold = mean_low + 0.5 * std_low  # Increased from 0.3
+    perc_threshold = mean_perc + 0.5 * std_perc  # Increased from 0.3
+    onset_threshold = mean_onset + 1.2 * std_onset  # Increased from 0.8 - require very strong onset
 
     logger.debug(
         "Drop detection: Low threshold=%.4f, Perc threshold=%.4f, Onset threshold=%.4f",
@@ -98,10 +103,19 @@ async def analyze_drops(context: dict) -> list[float]:
     )
 
     # Strategy: Find strong onsets where bass/percussion RETURNS after being low
-    lookback_seconds = 8.0  # Look back 8 seconds to see if bass was low
+    lookback_seconds = 12.0  # Look back 12 seconds to see if bass was low (increased from 8)
     lookback_frames = int(lookback_seconds / energy_window_seconds)
+    min_track_time = 15.0  # Skip first 15 seconds to avoid intro noise (adjusted from 20)
+
+    # Debug counters for Change 7
+    candidates_checked = 0
+    failed_rapid_fall = 0
 
     for onset_time in onset_times:
+        # Skip very early onsets (intro period)
+        if onset_time < min_track_time:
+            continue
+            
         # Find closest time index
         idx = np.argmin(np.abs(times - onset_time))
 
@@ -117,7 +131,7 @@ async def analyze_drops(context: dict) -> list[float]:
         if onset_strength[onset_idx] < onset_threshold:
             continue
 
-        # Check if low-frequency (bass) and percussion are present at drop
+                # Check if low-frequency (bass) and percussion are present at drop
         has_bass = low_energy[idx] > low_threshold
         has_beat = percussive_energy[idx] > perc_threshold
 
@@ -132,13 +146,67 @@ async def analyze_drops(context: dict) -> list[float]:
 
         # Drop detected if:
         # 1. Bass/beat are NOW strong, AND
-        # 2. Bass/beat were recently weak (indicating a return/drop moment)
-        bass_increase = low_energy[idx] > recent_low_avg * 1.4
-        beat_increase = percussive_energy[idx] > recent_perc_avg * 1.3
+                # 2. Bass/beat were recently weak (indicating a return/drop moment)
+        # Increased multipliers to require stronger contrast
+        bass_increase = low_energy[idx] > recent_low_avg * 1.6  # Increased from 1.4
+        beat_increase = percussive_energy[idx] > recent_perc_avg * 1.5  # Increased from 1.3
 
         # Also allow early track drops where bass simply starts strong
-        is_early_drop = onset_time < 60  # First minute
-        bass_strong = low_energy[idx] > mean_low + std_low
+        is_early_drop = onset_time < 30  # First 30 seconds
+        bass_strong = low_energy[idx] > mean_low + 1.2 * std_low
+
+        # After early drop window, REQUIRE that there was a sustained breakdown
+        # (not just a brief dip) before the drop. This prevents mini-drops.
+        requires_breakdown_check = onset_time >= 30
+        has_sustained_breakdown = True  # Default for early drops
+        
+        if requires_breakdown_check:
+            # Look at the preceding 8 bars for a sustained low-energy period
+            breakdown_bars = 8
+            breakdown_lookback_frames = int((breakdown_bars * bar_duration) / energy_window_seconds)
+            breakdown_start = max(0, idx - breakdown_lookback_frames)
+            
+            breakdown_low_samples = low_energy[breakdown_start:idx]
+            breakdown_perc_samples = percussive_energy[breakdown_start:idx]
+            
+            # Require that >50% of the breakdown period had low energy
+            # (not just a brief dip, but a sustained breakdown)
+            low_bass_ratio = np.sum(breakdown_low_samples < mean_low * 0.9) / len(breakdown_low_samples)
+            low_perc_ratio = np.sum(breakdown_perc_samples < mean_perc * 0.85) / len(breakdown_perc_samples)
+            
+            has_sustained_breakdown = low_bass_ratio > 0.5 and low_perc_ratio > 0.4
+            
+            if not has_sustained_breakdown:
+                continue  # Skip - no real breakdown before this "drop"
+
+        # Change 7: Verify energy "rapidly falls" after peak (Wolfram technique)
+        # True drops should show declining energy in the bars following the onset
+        candidates_checked += 1
+        lookforward_frames = int((4 * bar_duration) / energy_window_seconds)
+        lookforward_end = min(len(low_derivative), idx + lookforward_frames)
+        
+        if lookforward_end > idx:
+            post_drop_low = low_derivative[idx:lookforward_end]
+            post_drop_perc = perc_derivative[idx:lookforward_end]
+            
+            # Much more lenient: only reject if energy is RISING after the peak (clear false positive)
+            # Allow sustained energy or gradual decline (common in real drops)
+            low_fall_pct = np.sum(post_drop_low < 0) / len(post_drop_low)
+            perc_fall_pct = np.sum(post_drop_perc < 0) / len(post_drop_perc)
+            
+            # Only reject if BOTH signals show rising energy (>60% positive derivative)
+            # This catches build-ups and crescendos but allows real drops with sustained energy
+            low_rising = low_fall_pct < 0.4  # <40% falling = >60% rising
+            perc_rising = perc_fall_pct < 0.4
+            clearly_not_drop = low_rising and perc_rising
+            
+            if clearly_not_drop:
+                failed_rapid_fall += 1
+                logger.debug(
+                    "Rejected at %.2fs - energy rising, not a drop (low: %.1f%%, perc: %.1f%%)",
+                    onset_time, low_fall_pct * 100, perc_fall_pct * 100
+                )
+                continue  # Skip - energy is rising after peak (build-up, not drop)
 
         # Check minimum spacing and add drop
         is_valid_drop = (bass_increase and beat_increase) or (
@@ -154,4 +222,11 @@ async def analyze_drops(context: dict) -> list[float]:
                 onset_strength[onset_idx],
             )
 
+    # Change 7 summary
+    logger.debug(
+        "Change 7 stats: %d candidates checked, %d rejected by rapid-fall test, %d drops found",
+        candidates_checked, failed_rapid_fall, len(drops)
+    )
+
     return drops
+

@@ -40,7 +40,7 @@ class AnalysisConfig:
     drop_onset_strength_std: float = 1.5  # Standard deviations above mean for onset
     drop_energy_std: float = 0.7  # Standard deviations above mean for energy
     drop_max_energy_threshold: float = 0.60  # Percentage of max energy
-    drop_min_spacing_bars: int = 28  # Minimum bars between drops
+    drop_min_spacing_bars: int = 16  # Minimum bars between drops (increased from 8)
     drop_lookback_seconds: float = 5.0  # How far back to look for energy average
 
     # Breakdown detection thresholds

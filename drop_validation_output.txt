@@ -1,0 +1,90 @@
+================================================================================
+DROP DETECTION VALIDATION - Change 7: Energy Derivative Analysis
+================================================================================
+
+Testing 10 tracks with new derivative-based validation
+This should reduce false positives by verifying energy 'rapidly falls' after peak
+
+================================================================================
+Analyzing: 3LAU, Dnmo - Falling.flac
+================================================================================
+✓ Detected 1 drop(s)
+  Drop times: ['29.6s']
+
+================================================================================
+Analyzing: AUTOFLOWER - Dimension.flac
+================================================================================
+✓ Detected 2 drop(s)
+  Drop times: ['18.0s', '128.7s']
+
+================================================================================
+Analyzing: AUTOFLOWER - THE ONLY ONE.flac
+================================================================================
+✓ Detected 1 drop(s)
+  Drop times: ['20.7s']
+
+================================================================================
+Analyzing: AUTOFLOWER - Wallflower.flac
+================================================================================
+✓ Detected 2 drop(s)
+  Drop times: ['16.5s', '62.0s']
+
+================================================================================
+Analyzing: AUTOFLOWER - When It's Over (Extended Mix).flac
+================================================================================
+✓ Detected 0 drop(s)
+
+================================================================================
+Analyzing: Activa - Get On With It (Extended Mix).flac
+================================================================================
+✓ Detected 0 drop(s)
+
+================================================================================
+Analyzing: Adam Beyer - Pilot.flac
+================================================================================
+✓ Detected 0 drop(s)
+
+================================================================================
+Analyzing: Adana Twins - Maya.flac
+================================================================================
+✓ Detected 4 drop(s)
+  Drop times: ['24.6s', '61.7s', '167.8s', '203.0s']
+
+================================================================================
+Analyzing: Agents Of Time - Zodiac.flac
+================================================================================
+✓ Detected 1 drop(s)
+  Drop times: ['20.5s']
+
+================================================================================
+Analyzing: Artbat - Artefact.flac
+================================================================================
+✓ Detected 3 drop(s)
+  Drop times: ['30.9s', '96.0s', '218.5s']
+
+================================================================================
+SUMMARY
+================================================================================
+
+Tracks analyzed: 10/10
+Total drops detected: 14
+Average drops per track: 1.4
+
+Per-track breakdown:
+  3LAU, Dnmo - Falling.flac: 1 drop(s)
+  AUTOFLOWER - Dimension.flac: 2 drop(s)
+  AUTOFLOWER - THE ONLY ONE.flac: 1 drop(s)
+  AUTOFLOWER - Wallflower.flac: 2 drop(s)
+  AUTOFLOWER - When It's Over (Extended Mix).flac: 0 drop(s)
+  Activa - Get On With It (Extended Mix).flac: 0 drop(s)
+  Adam Beyer - Pilot.flac: 0 drop(s)
+  Adana Twins - Maya.flac: 4 drop(s)
+  Agents Of Time - Zodiac.flac: 1 drop(s)
+  Artbat - Artefact.flac: 3 drop(s)
+
+================================================================================
+NOTE: Compare these results with baseline to evaluate Change 7 impact
+Expected: Reduction in total drops detected (fewer false positives)
+================================================================================
+
+Results saved to: /workspaces/edm-cue-analyzer/drop_validation_results.json
