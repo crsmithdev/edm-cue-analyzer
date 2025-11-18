@@ -1,47 +1,42 @@
 {
   "test_name": "Change 7: Energy Derivative Analysis",
   "tracks_tested": 10,
-  "total_drops": 69,
+  "total_drops": 51,
   "results": [
     {
       "file": "3LAU, Dnmo - Falling.flac",
       "drops": [
-        1.0,
-        35.0,
-        66.0,
-        100.0,
-        130.0,
-        161.0,
-        193.0
+        2.0,
+        61.0,
+        95.0,
+        125.0,
+        166.0,
+        204.0
       ],
-      "num_drops": 7,
+      "num_drops": 6,
       "success": true
     },
     {
       "file": "AUTOFLOWER - Dimension.flac",
       "drops": [
-        0.0,
-        37.0,
-        67.0,
-        99.0,
-        134.0,
-        164.0,
-        200.0
+        2.0,
+        32.0,
+        62.0,
+        95.0,
+        135.0,
+        168.0
       ],
-      "num_drops": 7,
+      "num_drops": 6,
       "success": true
     },
     {
       "file": "AUTOFLOWER - THE ONLY ONE.flac",
       "drops": [
         4.0,
-        43.0,
-        88.0,
-        120.0,
-        164.0,
-        213.0
+        60.0,
+        113.0
       ],
-      "num_drops": 6,
+      "num_drops": 3,
       "success": true
     },
     {
@@ -50,12 +45,11 @@
         3.0,
         48.0,
         83.0,
-        118.0,
-        153.0,
-        199.0,
-        231.0
+        124.0,
+        174.0,
+        213.0
       ],
-      "num_drops": 7,
+      "num_drops": 6,
       "success": true
     },
     {
@@ -67,15 +61,15 @@
     {
       "file": "Activa - Get On With It (Extended Mix).flac",
       "drops": [
-        1.0,
-        64.0,
-        98.0,
+        20.0,
+        80.0,
         134.0,
-        183.0,
-        241.0,
-        280.0,
-        318.0,
-        356.0
+        167.0,
+        200.0,
+        235.0,
+        268.0,
+        322.0,
+        406.0
       ],
       "num_drops": 9,
       "success": true
@@ -83,28 +77,25 @@
     {
       "file": "Adam Beyer - Pilot.flac",
       "drops": [
-        5.0,
-        54.0,
+        16.0,
         86.0,
         118.0,
-        162.0,
-        193.0,
-        225.0
+        162.0
       ],
-      "num_drops": 7,
+      "num_drops": 4,
       "success": true
     },
     {
       "file": "Adana Twins - Maya.flac",
       "drops": [
-        2.0,
-        50.0,
+        5.0,
+        53.0,
         101.0,
         146.0,
         197.0,
         245.0,
-        297.0,
-        341.0
+        290.0,
+        350.0
       ],
       "num_drops": 8,
       "success": true
@@ -113,32 +104,23 @@
       "file": "Agents Of Time - Zodiac.flac",
       "drops": [
         4.0,
-        35.0,
-        88.0,
-        133.0,
-        181.0,
-        213.0,
-        253.0,
-        288.0,
-        323.0
+        39.0,
+        221.0,
+        255.0,
+        288.0
       ],
-      "num_drops": 9,
+      "num_drops": 5,
       "success": true
     },
     {
       "file": "Artbat - Artefact.flac",
       "drops": [
         1.0,
-        34.0,
-        68.0,
-        103.0,
-        138.0,
-        175.0,
-        206.0,
-        246.0,
-        286.0
+        53.0,
+        94.0,
+        138.0
       ],
-      "num_drops": 9,
+      "num_drops": 4,
       "success": true
     }
   ]

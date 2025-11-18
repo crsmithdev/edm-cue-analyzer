@@ -3,6 +3,9 @@
 Compare detected drops against manual ground truth.
 """
 
+import json
+from pathlib import Path
+
 # Manual ground truth (converted to seconds)
 GROUND_TRUTH = {
     "AUTOFLOWER - Dimension.flac": [128.0],  # 2m8s
@@ -16,19 +19,22 @@ GROUND_TRUTH = {
     "3LAU, Dnmo - Falling.flac": [44.0, 160.0],  # 44s, 2m40s
 }
 
-# Detected results
-DETECTED = {
-    "3LAU, Dnmo - Falling.flac": [29.6],
-    "AUTOFLOWER - Dimension.flac": [18.0, 128.7],
-    "AUTOFLOWER - THE ONLY ONE.flac": [20.7],
-    "AUTOFLOWER - Wallflower.flac": [16.5, 62.0],
-    "AUTOFLOWER - When It's Over (Extended Mix).flac": [],
-    "Activa - Get On With It (Extended Mix).flac": [],
-    "Adam Beyer - Pilot.flac": [],
-    "Adana Twins - Maya.flac": [24.6, 61.7, 167.8, 203.0],
-    "Agents Of Time - Zodiac.flac": [20.5],
-    "Artbat - Artefact.flac": [30.9, 96.0, 218.5],
-}
+# Load detected results from JSON
+def load_detected_results():
+    """Load results from validation output."""
+    results_file = Path('/workspaces/edm-cue-analyzer/drop_validation_results.json')
+    if not results_file.exists():
+        print(f"ERROR: {results_file} not found. Run validate_drops.py first.")
+        return {}
+    
+    data = json.load(open(results_file))
+    detected = {}
+    for result in data['results']:
+        if result['success']:
+            detected[result['file']] = result['drops']
+    return detected
+
+DETECTED = load_detected_results()
 
 def match_drops(detected, ground_truth, tolerance=5.0):
     """

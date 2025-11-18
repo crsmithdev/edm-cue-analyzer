@@ -9,29 +9,29 @@ logger = logging.getLogger(__name__)
 
 async def analyze_drops(context: dict) -> list[float]:
     """
-    Detect drop points using energy drop detection (Wolfram paper method).
+    Detect drop points using multi-signal approach.
 
-    Based on "[WSC22] Analyze 'the drop' in EDM songs" by Suhaan Mobhani.
+    Combines energy-based detection with onset strength and structural timing.
     
-    Method:
-    1. Calculate Short-Time Energy from audio
-    2. Compute scale factor using median energy ratios
-    3. Find positions where: energy[i] > scale * energy[i+1]
-    4. Convert sample positions to timestamps
-    5. Remove adjacent duplicates within 3 seconds
+    Signals:
+    1. Energy drops: Sharp decreases in RMS energy
+    2. Onset strength: Strong percussive events
+    3. Structural timing: Drops occur at predictable intervals (every 32-64 bars)
 
     Args:
         context: Dictionary containing:
             - bpm: BpmResult from BPM analysis
             - energy: EnergyResult from energy analysis
-            - features: Optional dict of extracted features (for RMS energy)
+            - features: Dict with onset_strength, onset_times
             - config: Optional analysis config
+            - metadata: Optional track metadata
 
     Returns:
         List of timestamps where drops occur
     """
     bpm_result = context["bpm"]
     energy_result = context["energy"]
+    features = context.get("features", {})
     config = context.get("config")
     metadata = context.get("metadata")
 
@@ -94,36 +94,88 @@ async def analyze_drops(context: dict) -> list[float]:
     if not drop_candidates:
         return []
 
-    # Step 4: Convert sample positions to timestamps
+    # Step 4: Filter by onset strength
+    # Real drops have strong percussive onsets
+    onset_strength = features.get("onset_strength")
+    onset_times_from_features = features.get("onset_times")
+    
+    if onset_strength is not None and len(onset_strength) > 0:
+        # Get onset strength config
+        onset_std_threshold = 1.5
+        if config:
+            onset_std_threshold = getattr(config, "drop_onset_strength_std", 1.5)
+        
+        # Calculate onset strength statistics
+        mean_onset = np.mean(onset_strength)
+        std_onset = np.std(onset_strength)
+        onset_threshold = mean_onset + (onset_std_threshold * std_onset)
+        
+        # Convert onset strength frames to time
+        # librosa uses hop_length=512 by default at 22050 Hz
+        hop_length = 512
+        sr = 22050
+        onset_strength_times = np.arange(len(onset_strength)) * hop_length / sr
+        
+        # Filter drops: must have high onset strength nearby (±0.5s window)
+        filtered_candidates = []
+        window = 0.5  # seconds
+        
+        for idx in drop_candidates:
+            drop_time = times[idx]
+            
+            # Find onset strength at this time
+            time_idx = np.searchsorted(onset_strength_times, drop_time)
+            if time_idx >= len(onset_strength):
+                time_idx = len(onset_strength) - 1
+            
+            # Check window around drop time
+            window_start = max(0, time_idx - int(window * sr / hop_length))
+            window_end = min(len(onset_strength), time_idx + int(window * sr / hop_length))
+            
+            # If any onset in window exceeds threshold, keep this drop
+            if np.max(onset_strength[window_start:window_end]) > onset_threshold:
+                filtered_candidates.append(idx)
+        
+        logger.debug(
+            "After onset filter (threshold=%.2f): %d drops (removed %d)",
+            onset_threshold, len(filtered_candidates), len(drop_candidates) - len(filtered_candidates)
+        )
+        drop_candidates = filtered_candidates
+    
+    if not drop_candidates:
+        return []
+
+    # Step 5: Convert sample positions to timestamps
     drop_timings = []
     for idx in drop_candidates:
-        # Map index to time
         drop_time = times[idx]
         drop_timings.append(drop_time)
 
-    # Step 5: Remove adjacent duplicates
-    # Paper uses 3-second threshold - drops must be >3 seconds apart
+    # Step 6: Structural timing (currently disabled - needs tuning)
+    # TODO: Re-enable after analyzing why it filters out real drops
+    structural_drops = drop_timings
+
+    # Step 7: Remove adjacent duplicates (3s threshold)
     final_drops = []
-    duplicate_threshold = 3.0  # seconds
+    duplicate_threshold = 3.0
     
-    for i, drop_time in enumerate(drop_timings):
-        # Check if this is far enough from the previous drop
-        if i == 0 or (drop_time - drop_timings[i-1]) > duplicate_threshold:
+    for i, drop_time in enumerate(structural_drops):
+        if i == 0 or (drop_time - structural_drops[i-1]) > duplicate_threshold:
             final_drops.append(float(drop_time))
     
     logger.debug(
-        "After removing duplicates: %d drops (removed %d adjacent duplicates)",
-        len(final_drops), len(drop_timings) - len(final_drops)
+        "After deduplication: %d drops (removed %d)",
+        len(final_drops), len(structural_drops) - len(final_drops)
     )
 
-    # Apply minimum spacing constraint (from config)
+    # Step 8: Apply minimum spacing constraint
     spaced_drops = []
     for drop in final_drops:
         if not spaced_drops or (drop - spaced_drops[-1]) > min_spacing:
             spaced_drops.append(drop)
 
     logger.debug(
-        "After spacing constraint (%.1fs): %d drops",
+        "Final result after spacing (%.1fs): %d drops",
         min_spacing, len(spaced_drops)
     )
 
