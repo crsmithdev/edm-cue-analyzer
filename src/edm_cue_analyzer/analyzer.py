@@ -200,6 +200,9 @@ class SpectralFeatureExtractor(FeatureExtractor):
         # Spectral centroid
         features["spectral_centroid"] = librosa.feature.spectral_centroid(y=y, sr=sr)[0]
 
+        # Spectral contrast - important for drop detection
+        features["spectral_contrast"] = librosa.feature.spectral_contrast(y=y, sr=sr)
+
         # Frequency band energy
         stft = np.abs(librosa.stft(y))
         freqs = librosa.fft_frequencies(sr=sr)
