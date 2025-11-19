@@ -19,7 +19,6 @@ import logging
 import librosa
 import numpy as np
 from scipy.signal import savgol_filter
-from sklearn.preprocessing import StandardScaler
 
 logger = logging.getLogger(__name__)
 
@@ -485,7 +484,7 @@ def _compute_drop_confidence(features_dict: dict) -> float:
         while len(weights) < len(confidence_factors):
             weights.append(1.0)
 
-        weighted_sum = sum(f * w for f, w in zip(confidence_factors, weights))
+        weighted_sum = sum(f * w for f, w in zip(confidence_factors, weights, strict=True))
         total_weight = sum(weights)
         confidence = weighted_sum / total_weight
     else:
@@ -519,38 +518,31 @@ def _validate_drops_with_spectrogram(
     window_size = 2048
     hop_length = 512
 
-    D = librosa.stft(y, n_fft=window_size, hop_length=hop_length)
-    magnitude = np.abs(D)
+    stft_result = librosa.stft(y, n_fft=window_size, hop_length=hop_length)
+    magnitude = np.abs(stft_result)
 
     # Define frequency bands as per guide
     freqs = librosa.fft_frequencies(sr=sr, n_fft=window_size)
 
     # Bass: 20-150 Hz, Mid: 150-2000 Hz, High: 2000+ Hz
     low_mask = (freqs >= 20) & (freqs <= 150)
-    mid_mask = (freqs > 150) & (freqs <= 2000)
-    high_mask = freqs > 2000
+    # mid_mask = (freqs > 150) & (freqs <= 2000)  # Not used in current validation
+    # high_mask = freqs > 2000  # Not used in current validation
 
     # Compute band energies over time
     low_energy = np.mean(magnitude[low_mask, :], axis=0) if np.any(low_mask) else np.zeros(magnitude.shape[1])
-    mid_energy = np.mean(magnitude[mid_mask, :], axis=0) if np.any(mid_mask) else np.zeros(magnitude.shape[1])
-    high_energy = np.mean(magnitude[high_mask, :], axis=0) if np.any(high_mask) else np.zeros(magnitude.shape[1])
+    # mid_energy = np.mean(magnitude[mid_mask, :], axis=0) if np.any(mid_mask) else np.zeros(magnitude.shape[1])  # Not used in current validation
+    # high_energy = np.mean(magnitude[high_mask, :], axis=0) if np.any(high_mask) else np.zeros(magnitude.shape[1])  # Not used in current validation
 
     # Smooth energy curves using Savitzky-Golay filter (as per guide)
-    if len(low_energy) > 51:
-        low_smooth = savgol_filter(low_energy, 51, 3)
-        mid_smooth = savgol_filter(mid_energy, 51, 3)
-        high_smooth = savgol_filter(high_energy, 51, 3)
-    else:
-        low_smooth = low_energy
-        mid_smooth = mid_energy
-        high_smooth = high_energy
+    low_smooth = savgol_filter(low_energy, 51, 3) if len(low_energy) > 51 else low_energy
 
     # Validate each candidate
     validated_drops = []
 
     for candidate in drop_candidates:
         drop_time = candidate["time"]
-        confidence = candidate["confidence"]
+        # confidence = candidate["confidence"]
 
         # Convert time to frame
         drop_frame = int(drop_time * sr / hop_length)
@@ -567,36 +559,35 @@ def _validate_drops_with_spectrogram(
         window_frames = int(1.0 * sr / hop_length)
 
         pre_start = max(0, drop_frame - window_frames)
-        
+
         # Check multiple drop positions: 1s before boundary, at boundary, +0.5s, +1.0s after
-        # This handles cases where the structural change is detected slightly before/after 
+        # This handles cases where the structural change is detected slightly before/after
         # the actual bass drop
         best_bass_increase = False
         best_pre_bass = 0
         best_post_bass = 0
         best_offset = 0
-        
-        for offset_frames in [-window_frames, -int(0.5 * sr / hop_length), 0, 
+
+        for offset_frames in [-window_frames, -int(0.5 * sr / hop_length), 0,
                                int(0.5 * sr / hop_length), window_frames]:
             test_drop_frame = drop_frame + offset_frames
-            
+
             if test_drop_frame < window_frames or test_drop_frame >= len(low_smooth) - window_frames:
                 continue
-            
+
             test_pre_start = max(0, test_drop_frame - window_frames)
             test_post_end = min(len(low_smooth), test_drop_frame + window_frames)
-            
+
             pre_bass = np.mean(low_smooth[test_pre_start:test_drop_frame])
             post_bass = np.mean(low_smooth[test_drop_frame:test_post_end])
-            
+
             # Check if this window shows a strong bass increase
-            if post_bass > pre_bass * 1.2:
-                # Use the window with the strongest bass surge
-                if post_bass > best_post_bass:
-                    best_bass_increase = True
-                    best_pre_bass = pre_bass
-                    best_post_bass = post_bass
-                    best_offset = offset_frames * hop_length / sr
+            # Use the window with the strongest bass surge
+            if post_bass > pre_bass * 1.2 and post_bass > best_post_bass:
+                best_bass_increase = True
+                best_pre_bass = pre_bass
+                best_post_bass = post_bass
+                best_offset = offset_frames * hop_length / sr
 
         pre_bass = best_pre_bass if best_bass_increase else np.mean(low_smooth[pre_start:drop_frame])
         post_end = min(len(low_smooth), drop_frame + window_frames)
