@@ -17,16 +17,12 @@ from edm_cue_analyzer.config import Config
 
 # Manual annotations from docs/annotations.md
 MANUAL_ANNOTATIONS = {
-    "Autoflower - When It's Over.wav": [31, 155],  # 31s, 2m35s
-    "Elysian - Come Back Down.wav": [34, 98, 162],  # 34s, 1m38s, 2m42s  
-    "Flux Pavilion - I Can't Stop.wav": [27, 91, 155],  # 27s, 1m31s, 2m35s
-    "Mat Zo - Superman.wav": [32, 96, 160],  # 32s, 1m36s, 2m40s
-    "Modestep - Feel Good.wav": [37, 101, 165],  # 37s, 1m41s, 2m45s
-    "MUST DIE! - VIPs.wav": [22, 86],  # 22s, 1m26s
-    "Nero - Promises.wav": [38, 102, 166],  # 38s, 1m42s, 2m46s
-    "Porter Robinson - Language.wav": [35, 99],  # 35s, 1m39s
-    "Skrillex - Bangarang.wav": [21, 64, 107],  # 21s, 1m04s, 1m47s
-    "Zomboy - Like A Bitch.wav": [29, 93, 157]  # 29s, 1m33s, 2m37s
+    "AUTOFLOWER - When It's Over (Extended Mix).flac": [31, 155],  # 31s, 2m35s
+    "Activa - Get On With It (Extended Mix).flac": [27, 243],  # 27s, 4m3s
+    "Adana Twins - Maya.flac": [123, 261],  # 2m3s, 4m21s
+    "Agents Of Time - Zodiac.flac": [107, 243],  # 1m47s, 4m3s
+    "Artbat - Artefact.flac": [30, 90, 167, 215],  # 30s, 1m30s, 2m47s, 3m35s
+    "3LAU, Dnmo - Falling.flac": [44, 160],  # 44s, 2m40s
 }
 
 async def analyze_track_drops(file_path):
@@ -36,10 +32,11 @@ async def analyze_track_drops(file_path):
         analyzer = AudioAnalyzer(config)
         
         print(f"\nAnalyzing: {file_path.name}")
-        structure = await analyzer.analyze_file(file_path)
+        structure = await analyzer.analyze_with(file_path, analyses={'drops'})
         
         if hasattr(structure, 'drops') and structure.drops:
-            detected_times = [round(drop.time, 1) for drop in structure.drops]
+            # drops is a list of float time values
+            detected_times = [round(drop, 1) for drop in structure.drops]
             print(f"Detected drops: {detected_times}")
             return detected_times
         else:
@@ -180,7 +177,7 @@ async def main():
         else:
             status = "❌ POOR"
         
-        print(f"{track_name:<30} {manual_count:<8} {detected_count:<10} {precision:.2f:<5} {recall:.2f:<5} {status}")
+        print(f"{track_name:<30} {manual_count:<8} {detected_count:<10} {precision:<5.2f} {recall:<5.2f} {status}")
 
 if __name__ == "__main__":
     # Set up logging to suppress debug output
